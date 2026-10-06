@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 결과 엑셀 (내부용 자료라 올리지 않음)
+*.xlsx
+
+# 지울 파일을 잠시 옮겨 두는 폴더
+trash-can/
