@@ -43,13 +43,17 @@ export interface RawItem {
 /** 페이지 하나의 수집 결과 */
 export interface PageResult {
   target: PageTarget;
-  status: '성공' | '수집 실패';
+  /** 시간 초과: 묶음 시간 한도(100초) 때문에 열지 못한 페이지. 화면이 맨 뒤에 1번 더 보낸다 */
+  status: '성공' | '수집 실패' | '시간 초과';
   /** 실패 이유. 예: "60초 안에 열리지 않음" */
   error?: string;
   items: RawItem[];
 }
 
-/** 같은 항목이 놓인 위치 하나 */
+/**
+ * 같은 항목이 놓인 위치 하나.
+ * PRD의 "위치"는 menu · url · region 3가지이고, hidden은 엑셀의 별도 "숨김 여부" 열에 쓴다.
+ */
 export interface Location {
   course: Course;
   menu: string;
