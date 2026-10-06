@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "collect:dev": "node --no-warnings scripts/collect-dev.ts"
+    "collect:dev": "node --no-warnings scripts/collect-dev.ts",
+    "check:sample": "node --no-warnings scripts/check-sample.ts"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
