@@ -2,7 +2,8 @@
 // 시트: 안내 · 공통항목_요약 · 초등 · 중학 · 고교 · 수집 페이지 (PRD must 2: 6개로 고정)
 // 사용자 브라우저 안에서 만든다(서버 시간을 쓰지 않도록). [엑셀 다운로드]를 누를 때 불러온다.
 // 3과정 공통 항목은 공통ID 칸을 노란색으로 칠한다(작업 21).
-// 실패 경고·실패 목록(작업 22), 파일 이름·다운로드(작업 23)는 다음 작업에서 더한다.
+// 수집 실패 페이지가 있으면 "안내" 시트 맨 위에 실패 목록을 적는다(작업 22).
+// 다운로드 전 경고 문장은 lib/download.ts, 파일 이름·다운로드(작업 23)는 다음 작업에서 더한다.
 //
 // scripts/에서도 불러올 수 있도록 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
@@ -92,10 +93,25 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput): void {
   ];
   ws.addRow(['SGIS에듀 3과정 이미지·문구 위치']);
   ws.addRow([]);
+
+  // 수집 실패 목록: 엑셀만 받은 작업자도 빠진 페이지를 알 수 있도록 맨 위에 빨간 글씨로 적는다 (PRD must 2)
+  const failed = results.filter((r) => r.status !== '성공');
+  const redRows = new Set<number>();
+  if (failed.length > 0) {
+    redRows.add(ws.addRow([`⚠ 수집 실패 ${failed.length}개`, '아래 페이지는 수집하지 못해 이 파일에 위치가 빠져 있습니다. 직접 확인하세요.']).number);
+    for (const r of failed) {
+      redRows.add(ws.addRow([`${r.target.course} ${r.target.menu}`, `${r.target.url}  —  ${r.error ?? r.status}`]).number);
+    }
+    ws.addRow([]);
+  }
+
   for (const line of lines) ws.addRow(line);
   ws.eachRow((row, n) =>
     row.eachCell((cell, colNumber) => {
-      cell.font = n === 1 ? { ...FONT, size: 14, bold: true } : { ...FONT, bold: colNumber === 1 };
+      cell.font =
+        n === 1
+          ? { ...FONT, size: 14, bold: true }
+          : { ...FONT, bold: colNumber === 1, ...(redRows.has(n) ? { color: { argb: 'FFC00000' } } : {}) };
       cell.alignment = { vertical: 'top', wrapText: true };
     }),
   );
