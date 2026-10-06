@@ -60,11 +60,13 @@ function pickSamples(groups: Group[], n: number, random: () => number): Sample[]
 /** 페이지 안에서: 영역에 속하는 요소들의 글자와 그림 주소를 모은다(수집 코드와 다른 방법) */
 async function readRegion(page: Page, region: Region): Promise<{ text: string; imageUrls: string[] }> {
   return page.evaluate((region) => {
+    // 수집과 같게 줄바꿈(<br>)을 띄어쓰기 한 칸으로 본다
+    for (const br of document.querySelectorAll('br')) br.after(document.createTextNode(' '));
     const regionOf = (el: Element): string => {
       for (let e: Element | null = el; e && e !== document.body; e = e.parentElement) {
         const name = `${typeof e.className === 'string' ? e.className : ''} ${e.id}`;
         const tag = e.tagName.toLowerCase();
-        if (tag === 'header' || /(^|[\s_-])(header|gnb)/i.test(name)) return '상단';
+        if (tag === 'header' || /header|gnb/i.test(name)) return '상단';
         if (tag === 'footer' || /footer/i.test(name)) return '하단';
       }
       return '본문';

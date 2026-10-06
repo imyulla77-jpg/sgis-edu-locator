@@ -62,14 +62,19 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * 앞 요청의 응답을 받은 뒤에만 다음 요청을 보내므로 같은 페이지를 동시에 두 번 열지 않는다.
  */
 async function sendWithRetry(send: SendBatch, batch: Batch, gapMs: number): Promise<PageResult[]> {
+  let reason = '서버 응답 없음';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return await send(batch);
-    } catch {
+    } catch (error) {
+      // 서버가 알려 준 안내 문장(예: "PC에 Edge나 Chrome이 필요해요")은 실패 이유로 그대로 남긴다.
+      // 한글이 없는 문장은 기술 용어일 수 있어 보여 주지 않는다(DESIGN.md 9장).
+      const message = error instanceof Error ? error.message : '';
+      if (/[가-힣]/.test(message)) reason = message;
       if (attempt === 0) await sleep(gapMs);
     }
   }
-  return batch.pages.map((target) => ({ target, status: '수집 실패', error: '서버 응답 없음', items: [] }));
+  return batch.pages.map((target) => ({ target, status: '수집 실패', error: reason, items: [] }));
 }
 
 /** 페이지 목록을 최대 6개씩 묶는다 (다시 보낼 때 씀) */

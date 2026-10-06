@@ -47,12 +47,13 @@ function readItemsInPage(boardDataSelector: string): RawItem[] {
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
   const hasWords = (s: string) => /[가-힣A-Za-z]/.test(s);
 
-  // 영역 판단: header·gnb → 상단, footer → 하단, 나머지 → 본문
+  // 영역 판단 (DESIGN.md 6장): 태그가 header이거나 이름에 header·gnb가 들어 있으면 상단(예: subHeader),
+  // 태그가 footer이거나 이름에 footer가 들어 있으면 하단, 나머지 → 본문
   const regionOf = (el: Element): RawItem['region'] => {
     for (let e: Element | null = el; e && e !== document.body; e = e.parentElement) {
       const name = `${typeof e.className === 'string' ? e.className : ''} ${e.id}`;
       const tag = e.tagName.toLowerCase();
-      if (tag === 'header' || /(^|[\s_-])(header|gnb)/i.test(name)) return '상단';
+      if (tag === 'header' || /header|gnb/i.test(name)) return '상단';
       if (tag === 'footer' || /footer/i.test(name)) return '하단';
     }
     return '본문';
@@ -85,13 +86,40 @@ function readItemsInPage(boardDataSelector: string): RawItem[] {
 
   // 1) 문구: 굵은 글씨 등으로 쪼개지지 않도록 가장 가까운 블록 요소 단위로 모은다(textContent 방식)
   const isInline = (el: Element) => getComputedStyle(el).display === 'inline';
+  // 문장 안에 끼어 있는 강조 글자(예: "볼 수 있습니다. <span class=accent>지도표출설정</span> 버튼을 클릭하세요")도
+  // 문장의 일부로 읽는다. 둘러싼 요소에 글자가 직접 있을 때만 — 메뉴 단추처럼 혼자 있는 덩어리는 따로 읽는다.
+  //  - 자신이 inline-block 등 inline 계열이거나
+  //  - 둘러싼 요소가 가로 정렬 상자(flex·grid)라서 브라우저가 block으로 바꾼 경우 (SGIS에듀 안내 목록의 li)
+  const hasOwnText = (el: Element) =>
+    [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && Boolean(n.nodeValue?.trim()));
+  const isInSentence = (el: Element) => {
+    const parent = el.parentElement;
+    if (!parent || !hasOwnText(parent)) return false;
+    const parentDisplay = getComputedStyle(parent).display;
+    return getComputedStyle(el).display.startsWith('inline') || /flex|grid/.test(parentDisplay);
+  };
   const textByBlock = new Map<Element, string>();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const blockOf = (start: Element): Element => {
+    let block = start;
+    while (block !== document.body && block.parentElement && (isInline(block) || isInSentence(block))) {
+      block = block.parentElement;
+    }
+    return block;
+  };
+  // 줄바꿈(<br>)은 띄어쓰기 한 칸으로 읽는다 — "첫 줄<br>둘째 줄"이 "첫 줄둘째 줄"로 붙지 않도록
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const br = node as Element;
+      if (br.tagName === 'BR' && br.parentElement && !br.closest(SKIP)) {
+        const block = blockOf(br.parentElement);
+        textByBlock.set(block, (textByBlock.get(block) ?? '') + ' ');
+      }
+      continue;
+    }
     const parent = node.parentElement;
     if (!parent || !node.nodeValue?.trim() || parent.closest(SKIP)) continue;
-    let block: Element = parent;
-    while (block !== document.body && block.parentElement && isInline(block)) block = block.parentElement;
+    const block = blockOf(parent);
     textByBlock.set(block, (textByBlock.get(block) ?? '') + node.nodeValue);
   }
   for (const [block, raw] of textByBlock) {
