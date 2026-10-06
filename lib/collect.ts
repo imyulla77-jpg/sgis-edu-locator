@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Page } from 'playwright-core';
-import { PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
+import { openPage, PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
 import { extractPageItems } from './extract.ts';
 import type { Batch, PageResult, PageTarget, RawItem } from './types.ts';
 import { isAllowedUrl } from './url.ts';
@@ -93,7 +93,7 @@ async function tryOpen(
   extract: Extractor,
 ): Promise<Attempt> {
   try {
-    const response = await page.goto(target.url, { waitUntil: 'networkidle', timeout: waitMs });
+    const response = await openPage(page, target.url, waitMs);
     if (response && response.status() >= 400) {
       return { ok: false, error: `페이지 응답 오류(${response.status()})`, cutByLimit: false };
     }

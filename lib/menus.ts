@@ -1,4 +1,5 @@
 // [서버 전용] 메뉴 읽기 → 수집 묶음 목록 (DESIGN.md 5장 ②·7장, PLAN 작업 5)
+// 시작 페이지·메인은 열거나 읽지 못하면 최대 2번 다시 시도한다(전체 50초 한도 안에서).
 // 시작 페이지에서 초등·중학·고교 메인 주소를 찾고, 메인마다 상단 메뉴를 읽어
 // "메인 3개 + 3과정 모두에 있는 상단 메뉴의 하위 메뉴 전부"를 수집 대상으로 만든다(PRD Q1 가).
 // 메뉴는 하드코딩하지 않고 매번 사이트에서 읽는다.
@@ -6,7 +7,7 @@
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import type { Page } from 'playwright-core';
-import { PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
+import { openPage, PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
 import type { Batch, Course, PageTarget } from './types.ts';
 import { COURSES } from './types.ts';
 import { SITE_UNAVAILABLE_MESSAGE } from './site-check.ts';
@@ -17,6 +18,25 @@ export const MAX_PAGES_PER_BATCH = 6;
 
 /** 페이지와 페이지 사이에 쉬는 시간 (PRD must 1: 1초 이상) */
 const PAGE_GAP_MS = 1_000;
+
+/** 처음 시도가 실패했을 때 다시 시도하는 횟수 (페이지 수집과 같은 규칙: 최대 2번) */
+const MAX_RETRIES = 2;
+
+/**
+ * 메뉴 읽기 전체의 시간 한도. /api/menus의 최대 실행 시간(60초) 안에 반드시 응답하기 위함.
+ * 재시도는 이 한도 안에서만 한다.
+ */
+export const MENU_TIME_LIMIT_MS = 50_000;
+
+/** 메뉴 읽기 설정. 시험할 때 시간을 줄이려고 바꿀 수 있게 열어 둔다 */
+export interface MenuOptions {
+  timeLimitMs?: number;
+  pageTimeoutMs?: number;
+  gapMs?: number;
+  maxRetries?: number;
+  /** 다시 시도할 때마다 알려 준다(개발용 실행에서 기록할 때 씀) */
+  onRetry?: (url: string, attempt: number) => void;
+}
 
 /** 메인 주소 속 과정 이름 → 과정 */
 const COURSE_BY_KEY: Record<string, Course> = { ele: '초등', mid: '중학', high: '고교' };
@@ -37,9 +57,61 @@ export class MenuError extends Error {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 페이지를 열고, 화면이 다 그려질 때까지(추가 요청이 멈출 때까지) 기다린다 */
-async function openPage(page: Page, url: string): Promise<void> {
-  await page.goto(url, { waitUntil: 'networkidle', timeout: PAGE_TIMEOUT_MS });
+/** 메뉴가 다 채워졌는지 확인할 때 두 번 읽는 간격과, 같은 결과가 나올 때까지 기다리는 최대 시간 */
+const STABLE_CHECK_GAP_MS = 500;
+const STABLE_MAX_MS = 5_000;
+
+/**
+ * 같은 결과가 두 번 연속 나올 때까지 0.5초 간격으로 읽는다(최대 5초).
+ * 메뉴 이름 일부는 페이지가 열린 뒤 채워지므로, 덜 채워진 메뉴를 읽지 않기 위함.
+ */
+async function readWhenStable<T>(page: Page, read: (page: Page) => Promise<T>, maxMs: number): Promise<T> {
+  const until = Date.now() + Math.min(STABLE_MAX_MS, maxMs);
+  let previous = await read(page);
+  while (Date.now() < until) {
+    await sleep(STABLE_CHECK_GAP_MS);
+    const current = await read(page);
+    if (JSON.stringify(current) === JSON.stringify(previous)) return current;
+    previous = current;
+  }
+  return previous;
+}
+
+/**
+ * 페이지를 열고(browser.ts의 openPage) 메뉴가 다 채워질 때까지 기다려 내용을 읽는다.
+ * 실패하면 1초 쉬고 최대 2번 다시 시도한다.
+ * - 페이지가 안 열리거나, 읽은 내용이 비어 있으면(화면이 덜 그려짐) 다시 시도한다
+ * - 기다리는 시간은 60초와 남은 메뉴 읽기 시간 중 짧은 쪽
+ * - 끝까지 비어 있으면 마지막으로 읽은 내용을 그대로 돌려준다(부르는 쪽이 알맞은 안내를 고른다)
+ * - 한 번도 열지 못했으면 "사이트 접속 불가"
+ */
+async function openAndRead<T>(
+  page: Page,
+  url: string,
+  read: (page: Page) => Promise<T>,
+  isEmpty: (value: T) => boolean,
+  timing: { timeLeft: () => number; pageTimeoutMs: number; gapMs: number; maxRetries: number },
+  onRetry?: (url: string, attempt: number) => void,
+): Promise<T> {
+  let lastRead: { value: T } | null = null;
+  for (let attempt = 0; attempt <= timing.maxRetries; attempt++) {
+    if (attempt > 0) {
+      onRetry?.(url, attempt);
+      await sleep(timing.gapMs);
+    }
+    const waitMs = Math.min(timing.pageTimeoutMs, timing.timeLeft());
+    if (waitMs <= 0) break;
+    try {
+      const started = Date.now();
+      await openPage(page, url, waitMs);
+      lastRead = { value: await readWhenStable(page, read, waitMs - (Date.now() - started)) };
+      if (!isEmpty(lastRead.value)) return lastRead.value;
+    } catch {
+      // 열리지 않음 → 다음 시도로 넘어간다
+    }
+  }
+  if (lastRead) return lastRead.value;
+  throw new MenuError(SITE_UNAVAILABLE_MESSAGE);
 }
 
 /** 시작 페이지에서 과정별 메인 주소를 찾는다 */
@@ -134,25 +206,53 @@ export function buildBatches(
 
 /**
  * 시작 주소에서 출발해 수집 묶음 목록을 만든다.
- * 시작 주소가 잘못됐거나, 시작 페이지·메인 3개 중 하나라도 열지 못하면 MenuError를 던진다.
+ * - 시작 페이지와 메인 3개는 각각 최대 2번 다시 시도한다(전체 50초 한도 안에서)
+ * - 시작 주소가 잘못됐거나, 다시 시도해도 열지 못하면 MenuError를 던진다
  */
-export async function loadBatches(startUrl: string): Promise<{ batches: Batch[]; totalPages: number }> {
+export async function loadBatches(
+  startUrl: string,
+  options: MenuOptions = {},
+): Promise<{ batches: Batch[]; totalPages: number }> {
   if (!isAllowedUrl(startUrl)) throw new MenuError(URL_ERROR_MESSAGE);
+  const {
+    timeLimitMs = MENU_TIME_LIMIT_MS,
+    pageTimeoutMs = PAGE_TIMEOUT_MS,
+    gapMs = PAGE_GAP_MS,
+    maxRetries = MAX_RETRIES,
+    onRetry,
+  } = options;
+  const deadline = Date.now() + timeLimitMs;
+  const timing = { timeLeft: () => deadline - Date.now(), pageTimeoutMs, gapMs, maxRetries };
 
   return withBrowser(async (browser) => {
     const page = await browser.newPage();
     try {
-      await openPage(page, startUrl.trim());
-      const found = await readCourseMains(page);
+      // 시작 페이지: 세 과정 중 하나라도 못 찾으면 덜 그려진 것으로 보고 다시 읽는다
+      const found = await openAndRead(
+        page,
+        startUrl.trim(),
+        readCourseMains,
+        (mains) => COURSES.some((c) => !mains[c]),
+        timing,
+        onRetry,
+      );
       const missing = COURSES.filter((c) => !found[c]);
       if (missing.length > 0) throw new MenuError(`시작 페이지에서 ${missing.join('·')} 과정을 찾지 못했어요`);
       const mains = found as Record<Course, string>;
 
       const menusByCourse = {} as Record<Course, TopMenu[]>;
       for (const course of COURSES) {
-        await sleep(PAGE_GAP_MS);
-        await openPage(page, mains[course]);
-        menusByCourse[course] = await readTopMenus(page);
+        await sleep(gapMs);
+        // 메인: 상단 메뉴가 하나도 없으면 덜 그려진 것으로 보고 다시 읽는다
+        menusByCourse[course] = await openAndRead(
+          page,
+          mains[course],
+          readTopMenus,
+          (menus) => menus.length === 0,
+          timing,
+          onRetry,
+        );
+        if (menusByCourse[course].length === 0) throw new MenuError(`${course} 메인에서 상단 메뉴를 읽지 못했어요`);
       }
 
       const batches = buildBatches(mains, menusByCourse);
