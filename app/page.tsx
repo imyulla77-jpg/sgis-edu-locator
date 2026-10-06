@@ -1,20 +1,22 @@
 'use client';
 
-// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17·18)
-// 결과 화면(요약·검색)은 PLAN 작업 19에서 채운다. 지금은 간단한 글자로만 보여 준다.
+// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17·18·19)
 
 import { useEffect, useState } from 'react';
 import ProgressPanel from '@/components/ProgressPanel';
+import ResultSearch from '@/components/ResultSearch';
+import ResultSummary from '@/components/ResultSummary';
 import StartForm from '@/components/StartForm';
 import { collectAll } from '@/lib/collect-client';
+import { buildGroups } from '@/lib/group';
 import type { RunProgress } from '@/lib/run-batches';
 import { SITE_UNAVAILABLE_MESSAGE } from '@/lib/site-check';
-import type { PageResult } from '@/lib/types';
+import type { Group, PageResult } from '@/lib/types';
 
 type Screen =
   | { kind: '시작' }
   | { kind: '수집 중'; progress: RunProgress | null }
-  | { kind: '결과'; results: PageResult[]; totalPages: number }
+  | { kind: '결과'; results: PageResult[]; totalPages: number; groups: Group[] }
   | { kind: '오류'; message: string };
 
 export default function Home() {
@@ -43,7 +45,9 @@ export default function Home() {
       if (outcome.stoppedAsUnavailable) {
         setScreen({ kind: '오류', message: SITE_UNAVAILABLE_MESSAGE });
       } else {
-        setScreen({ kind: '결과', results: outcome.results, totalPages: outcome.totalPages });
+        // 같은 항목 묶기·공통ID는 브라우저 안에서 한 번만 계산한다(DESIGN.md 5장 ④)
+        const groups = buildGroups(outcome.results);
+        setScreen({ kind: '결과', results: outcome.results, totalPages: outcome.totalPages, groups });
       }
     } catch (error) {
       // collect-client가 돌려주는 안내 문장은 화면에 그대로 보여 줘도 된다
@@ -51,8 +55,15 @@ export default function Home() {
     }
   };
 
+  // [다시 수집]: 지금 결과를 지우고 시작 화면으로. 되돌릴 수 없으니 먼저 확인한다(DESIGN.md 4.3장)
+  const recollect = () => {
+    if (window.confirm('지금 수집 결과가 사라져요. 다시 수집할까요?')) setScreen({ kind: '시작' });
+  };
+
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-12">
+    <main
+      className={`mx-auto flex w-full flex-1 flex-col gap-8 px-6 py-12 ${screen.kind === '결과' ? 'max-w-6xl' : 'max-w-3xl'}`}
+    >
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">SGIS에듀 현행화 위치찾기</h1>
         <p className="text-zinc-600 dark:text-zinc-400">초등·중학·고교 공통 메뉴의 이미지·문구 위치를 찾아요</p>
@@ -63,12 +74,19 @@ export default function Home() {
 
         {screen.kind === '수집 중' && <ProgressPanel progress={screen.progress} />}
 
-        {/* 임시 표시 — PLAN 작업 19에서 결과 화면(요약·검색)으로 바뀐다 */}
         {screen.kind === '결과' && (
-          <p>
-            수집 완료 · {screen.totalPages}페이지 · 성공 {screen.results.filter((r) => r.status === '성공').length} · 실패{' '}
-            {screen.results.filter((r) => r.status !== '성공').length}
-          </p>
+          <div className="flex flex-col gap-6">
+            <ResultSummary results={screen.results} totalPages={screen.totalPages} groups={screen.groups} />
+            <hr className="border-zinc-200 dark:border-zinc-800" />
+            <ResultSearch groups={screen.groups} />
+            <button
+              type="button"
+              onClick={recollect}
+              className="self-end rounded-md border border-zinc-300 px-4 py-2 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              다시 수집
+            </button>
+          </div>
         )}
 
         {/* 처음 3페이지 연속 실패·메뉴 읽기 실패 등: 진행 영역이 빨간 안내와 [처음으로]로 바뀐다(DESIGN.md 4.2장) */}
