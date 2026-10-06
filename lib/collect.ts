@@ -1,8 +1,10 @@
 // [서버 전용] 묶음 하나 수집 — 페이지 열기·재시도·시간 한도 (DESIGN.md 7장, PLAN 작업 6)
-// 페이지가 열리면 extract.ts의 extractPageItems로 이미지·문구를 읽는다(PLAN 작업 8).
+// 페이지가 열리면 extract.ts의 extractPageItems로 이미지·문구를 읽고(PLAN 작업 8),
+// 그림 파일을 내려받아 파일 지문(해시)을 붙인다(PLAN 작업 10).
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
+import { createHash } from 'node:crypto';
 import type { Page } from 'playwright-core';
 import { PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
 import { extractPageItems } from './extract.ts';
@@ -18,6 +20,9 @@ export const MAX_RETRIES = 2;
 /** 페이지를 열기 전에 쉬는 시간 (PRD must 1: 1초 이상) */
 export const PAGE_GAP_MS = 1_000;
 
+/** 그림 파일 하나를 내려받을 때 기다리는 최대 시간 */
+export const IMAGE_TIMEOUT_MS = 10_000;
+
 /** 열린 페이지에서 이미지·문구를 읽는 함수 (기본값: extractPageItems) */
 export type Extractor = (page: Page, target: PageTarget) => Promise<RawItem[]>;
 
@@ -28,9 +33,53 @@ export interface CollectOptions {
   pageTimeoutMs?: number;
   gapMs?: number;
   maxRetries?: number;
+  imageTimeoutMs?: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 그림 주소 → 파일 지문. 묶음 안에서 같은 주소는 한 번만 받는다. null = 받지 못함("비교 불가") */
+type FingerprintCache = Map<string, string | null>;
+
+/**
+ * 그림 파일을 내려받아 파일 지문(SHA-256)을 만든다. 받지 못하면 null.
+ * sgis.mods.go.kr 밖의 그림은 내려받지 않는다(앱이 다른 사이트에 요청을 보내지 않도록, DESIGN.md 10장).
+ */
+async function fingerprint(page: Page, url: string, waitMs: number): Promise<string | null> {
+  if (!isAllowedUrl(url) || waitMs <= 0) return null;
+  try {
+    const response = await page.request.get(url, { timeout: waitMs });
+    if (!response.ok()) return null;
+    return createHash('sha256').update(await response.body()).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+/** 이미지 항목에 파일 지문을 붙인다. 받지 못한 그림은 hash를 비워 둔다("비교 불가") */
+async function addFingerprints(
+  page: Page,
+  items: RawItem[],
+  cache: FingerprintCache,
+  waitFor: () => number,
+): Promise<RawItem[]> {
+  const result: RawItem[] = [];
+  for (const item of items) {
+    if (item.kind !== '이미지') {
+      result.push(item);
+      continue;
+    }
+    let hash = cache.get(item.value);
+    if (hash === undefined) {
+      const waitMs = waitFor();
+      hash = await fingerprint(page, item.value, waitMs);
+      // 묶음 시간이 다 돼서 못 받은 경우는 저장하지 않는다(다음 묶음에서 다시 받을 수 있도록)
+      if (waitMs > 0) cache.set(item.value, hash);
+    }
+    result.push(hash ? { ...item, hash } : item);
+  }
+  return result;
+}
 
 /** 한 번의 시도 결과 */
 type Attempt = { ok: true; items: RawItem[] } | { ok: false; error: string; cutByLimit: boolean };
@@ -75,6 +124,7 @@ export async function collectBatch(batch: Batch, options: CollectOptions = {}): 
     pageTimeoutMs = PAGE_TIMEOUT_MS,
     gapMs = PAGE_GAP_MS,
     maxRetries = MAX_RETRIES,
+    imageTimeoutMs = IMAGE_TIMEOUT_MS,
   } = options;
 
   const deadline = Date.now() + timeLimitMs;
@@ -83,6 +133,8 @@ export async function collectBatch(batch: Batch, options: CollectOptions = {}): 
   return withBrowser(async (browser) => {
     const page = await browser.newPage();
     const results: PageResult[] = [];
+    const cache: FingerprintCache = new Map();
+    const imageWait = () => Math.min(imageTimeoutMs, timeLeft());
 
     for (const target of batch.pages) {
       // sgis.mods.go.kr 주소가 아니면 열지 않는다(DESIGN.md 10장)
@@ -101,7 +153,7 @@ export async function collectBatch(batch: Batch, options: CollectOptions = {}): 
         const waitMs = Math.min(pageTimeoutMs, timeLeft());
         const outcome = await tryOpen(page, target, waitMs, waitMs < pageTimeoutMs, extract);
         if (outcome.ok) {
-          result = { target, status: '성공', items: outcome.items };
+          result = { target, status: '성공', items: await addFingerprints(page, outcome.items, cache, imageWait) };
         } else if (outcome.cutByLimit) {
           result = { target, status: '시간 초과', error: outcome.error, items: [] };
         } else if (attempt === maxRetries) {
