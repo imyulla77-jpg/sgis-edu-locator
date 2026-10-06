@@ -1,7 +1,7 @@
 'use client';
 
 // 결과 요약 — 페이지·실패·항목 수, 공통 범위별 개수, 엑셀 다운로드 버튼 (DESIGN.md 4.3장, PLAN 작업 19)
-// [엑셀 다운로드] 기능은 PLAN 작업 20~23에서 연결한다(onDownload가 없으면 버튼을 잠근다).
+// [엑셀 다운로드]는 onDownload에 연결된다(PLAN 작업 23). 엑셀을 만드는 동안은 버튼을 잠근다.
 
 import type { Group, PageResult } from '@/lib/types';
 import { COURSES } from '@/lib/types';
@@ -11,9 +11,11 @@ interface ResultSummaryProps {
   totalPages: number;
   groups: Group[];
   onDownload?: () => void;
+  /** 엑셀을 만드는 중이면 true */
+  downloading?: boolean;
 }
 
-export default function ResultSummary({ results, totalPages, groups, onDownload }: ResultSummaryProps) {
+export default function ResultSummary({ results, totalPages, groups, onDownload, downloading = false }: ResultSummaryProps) {
   const failed = results.filter((r) => r.status !== '성공');
   const byCourses = (n: number) => groups.filter((g) => g.courses.length === n).length;
   const fmt = (n: number) => n.toLocaleString('ko-KR');
@@ -34,11 +36,11 @@ export default function ResultSummary({ results, totalPages, groups, onDownload 
         <button
           type="button"
           onClick={onDownload}
-          disabled={!onDownload}
-          title={onDownload ? undefined : '엑셀 다운로드는 준비 중이에요'}
+          disabled={!onDownload || downloading}
+          aria-busy={downloading}
           className="rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
         >
-          엑셀 다운로드
+          {downloading ? '엑셀 만드는 중…' : '엑셀 다운로드'}
         </button>
       </div>
 

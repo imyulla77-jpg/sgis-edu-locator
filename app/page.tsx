@@ -1,6 +1,6 @@
 'use client';
 
-// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17·18·19)
+// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘, 엑셀 다운로드 (DESIGN.md 4장, PLAN 작업 16~19·23)
 
 import { useEffect, useState } from 'react';
 import ProgressPanel from '@/components/ProgressPanel';
@@ -8,6 +8,7 @@ import ResultSearch from '@/components/ResultSearch';
 import ResultSummary from '@/components/ResultSummary';
 import StartForm from '@/components/StartForm';
 import { collectAll } from '@/lib/collect-client';
+import { downloadExcel } from '@/lib/download';
 import { buildGroups } from '@/lib/group';
 import type { RunProgress } from '@/lib/run-batches';
 import { SITE_UNAVAILABLE_MESSAGE } from '@/lib/site-check';
@@ -16,11 +17,20 @@ import type { Group, PageResult } from '@/lib/types';
 type Screen =
   | { kind: '시작' }
   | { kind: '수집 중'; progress: RunProgress | null }
-  | { kind: '결과'; results: PageResult[]; totalPages: number; groups: Group[] }
+  | {
+      kind: '결과';
+      results: PageResult[];
+      totalPages: number;
+      groups: Group[];
+      /** 엑셀 "안내" 시트에 적을 시작 주소와 수집을 마친 시각 */
+      startUrl: string;
+      collectedAt: Date;
+    }
   | { kind: '오류'; message: string };
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>({ kind: '시작' });
+  const [downloading, setDownloading] = useState(false);
 
   // 수집 중·결과 화면에서 창을 닫거나 새로고침하려 하면 브라우저 기본 경고창을 띄운다 (PRD Q7, DESIGN.md 9장)
   // 결과는 브라우저 메모리에만 있어서 창을 닫으면 사라지기 때문.
@@ -47,11 +57,32 @@ export default function Home() {
       } else {
         // 같은 항목 묶기·공통ID는 브라우저 안에서 한 번만 계산한다(DESIGN.md 5장 ④)
         const groups = buildGroups(outcome.results);
-        setScreen({ kind: '결과', results: outcome.results, totalPages: outcome.totalPages, groups });
+        setScreen({
+          kind: '결과',
+          results: outcome.results,
+          totalPages: outcome.totalPages,
+          groups,
+          startUrl,
+          collectedAt: new Date(),
+        });
       }
     } catch (error) {
       // collect-client가 돌려주는 안내 문장은 화면에 그대로 보여 줘도 된다
       setScreen({ kind: '오류', message: error instanceof Error ? error.message : '수집 중 문제가 생겼어요' });
+    }
+  };
+
+  // [엑셀 다운로드]: 실패 페이지가 있으면 확인창 → 엑셀 만들기 → 내려받기 (PRD must 2, DESIGN.md 8장)
+  const download = async () => {
+    if (screen.kind !== '결과' || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadExcel(screen);
+    } catch (error) {
+      console.error('[엑셀 다운로드]', error);
+      window.alert('엑셀을 만드는 중 문제가 생겼어요. 다시 시도해 주세요.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -76,7 +107,13 @@ export default function Home() {
 
         {screen.kind === '결과' && (
           <div className="flex flex-col gap-6">
-            <ResultSummary results={screen.results} totalPages={screen.totalPages} groups={screen.groups} />
+            <ResultSummary
+              results={screen.results}
+              totalPages={screen.totalPages}
+              groups={screen.groups}
+              onDownload={download}
+              downloading={downloading}
+            />
             <hr className="border-zinc-200 dark:border-zinc-800" />
             <ResultSearch groups={screen.groups} />
             <button
