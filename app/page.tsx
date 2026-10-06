@@ -1,9 +1,9 @@
 'use client';
 
-// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17)
+// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17·18)
 // 결과 화면(요약·검색)은 PLAN 작업 19에서 채운다. 지금은 간단한 글자로만 보여 준다.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ProgressPanel from '@/components/ProgressPanel';
 import StartForm from '@/components/StartForm';
 import { collectAll } from '@/lib/collect-client';
@@ -19,6 +19,20 @@ type Screen =
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>({ kind: '시작' });
+
+  // 수집 중·결과 화면에서 창을 닫거나 새로고침하려 하면 브라우저 기본 경고창을 띄운다 (PRD Q7, DESIGN.md 9장)
+  // 결과는 브라우저 메모리에만 있어서 창을 닫으면 사라지기 때문.
+  // 최신 브라우저는 경고창에 직접 정한 문구를 보여 주지 않으므로 문구는 브라우저가 정한다.
+  const mustWarn = screen.kind === '수집 중' || screen.kind === '결과';
+  useEffect(() => {
+    if (!mustWarn) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = ''; // 오래된 브라우저에서도 경고창이 뜨도록
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [mustWarn]);
 
   const start = async (startUrl: string) => {
     setScreen({ kind: '수집 중', progress: null });
