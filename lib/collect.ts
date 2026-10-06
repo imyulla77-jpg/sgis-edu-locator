@@ -1,11 +1,11 @@
 // [서버 전용] 묶음 하나 수집 — 페이지 열기·재시도·시간 한도 (DESIGN.md 7장, PLAN 작업 6)
-// 이번 단계에서는 페이지를 여는 틀만 만든다. 페이지 안의 이미지·문구 읽기는
-// PLAN 작업 8에서 `extract` 자리에 채운다(그 전까지는 빈 목록).
+// 페이지가 열리면 extract.ts의 extractPageItems로 이미지·문구를 읽는다(PLAN 작업 8).
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import type { Page } from 'playwright-core';
 import { PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
+import { extractPageItems } from './extract.ts';
 import type { Batch, PageResult, PageTarget, RawItem } from './types.ts';
 import { isAllowedUrl } from './url.ts';
 
@@ -18,7 +18,7 @@ export const MAX_RETRIES = 2;
 /** 페이지를 열기 전에 쉬는 시간 (PRD must 1: 1초 이상) */
 export const PAGE_GAP_MS = 1_000;
 
-/** 열린 페이지에서 이미지·문구를 읽는 함수 (PLAN 작업 8에서 채움) */
+/** 열린 페이지에서 이미지·문구를 읽는 함수 (기본값: extractPageItems) */
 export type Extractor = (page: Page, target: PageTarget) => Promise<RawItem[]>;
 
 /** 수집 설정. 시험할 때 시간을 줄이려고 바꿀 수 있게 열어 둔다 */
@@ -70,7 +70,7 @@ async function tryOpen(
  */
 export async function collectBatch(batch: Batch, options: CollectOptions = {}): Promise<PageResult[]> {
   const {
-    extract = async () => [],
+    extract = extractPageItems,
     timeLimitMs = BATCH_TIME_LIMIT_MS,
     pageTimeoutMs = PAGE_TIMEOUT_MS,
     gapMs = PAGE_GAP_MS,
