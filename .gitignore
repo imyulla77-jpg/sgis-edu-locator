@@ -45,3 +45,6 @@ next-env.d.ts
 
 # 지울 파일을 잠시 옮겨 두는 폴더
 trash-can/
+
+# 개발용 전체 수집 결과 (내부용 자료라 올리지 않음)
+dev-output/
