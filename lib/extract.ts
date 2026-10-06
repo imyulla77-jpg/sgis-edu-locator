@@ -2,12 +2,27 @@
 // - 탭·펼침 메뉴를 클릭하지 않고 화면 구조(DOM) 전체를 읽는다 → 숨은 요소도 함께 수집
 // - 이미지: <img> 태그와 CSS 배경 이미지 / 문구: 글자 + 버튼 글자
 // - 항목마다 영역(상단/본문/하단)과 숨김 여부를 붙인다. 메뉴·페이지 주소는 수집 대상(PageTarget)에 이미 있다
-// - 게시판 데이터 제외(작업 9)와 그림 파일 지문(작업 10)은 다음 작업에서 붙인다
+// - 게시판 데이터(글 제목·글쓴이 등)는 수집하지 않는다(PRD Q4, PLAN 작업 9)
+// - 그림 파일 지문(작업 10)은 다음 작업에서 붙인다
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import type { Page } from 'playwright-core';
 import type { PageTarget, RawItem } from './types.ts';
+
+/**
+ * 게시판 데이터가 들어 있는 영역 (DESIGN.md 6장 "게시판 데이터 제외 규칙")
+ * - 모든 페이지: 이름이 board…List인 게시글 목록 (게시판 페이지의 `#boardList`, 메인 미리보기의 `#board12List`·`#board13List` 등)
+ * - 게시판 페이지(주소에 boardList): 표의 본문 줄(`tbody`) 전부
+ * 표 제목(caption)·열 이름(thead)·미리보기 상자의 제목과 [더보기]는 게시판 데이터가 아닌 화면 글자라 수집한다.
+ */
+const BOARD_DATA_ALWAYS = '[id^="board"][id$="List"]';
+const BOARD_DATA_ON_BOARD_PAGE = `${BOARD_DATA_ALWAYS}, tbody`;
+
+/** 게시판 목록이 있는 페이지인지 (주소에 boardList가 들어감) */
+export function isBoardPage(url: string): boolean {
+  return /boardList/i.test(url);
+}
 
 /** 지연 로딩 그림까지 불러오도록 페이지를 끝까지 스크롤한다 */
 async function scrollToBottom(page: Page): Promise<void> {
@@ -25,7 +40,7 @@ async function scrollToBottom(page: Page): Promise<void> {
  * 페이지 안에서 실행되는 읽기 함수.
  * 브라우저로 보내져 실행되므로 이 함수 밖의 변수·함수를 쓰면 안 된다.
  */
-function readItemsInPage(): RawItem[] {
+function readItemsInPage(boardDataSelector: string): RawItem[] {
   const items: RawItem[] = [];
 
   // 문구 정리: 연속된 띄어쓰기·줄바꿈을 한 칸으로, 앞뒤 공백 제거. 한글·영문이 없으면 버린다
@@ -65,7 +80,8 @@ function readItemsInPage(): RawItem[] {
     items.push(full);
   };
 
-  const SKIP = 'script, style, noscript, template, iframe, option';
+  // 읽지 않는 곳: 화면에 안 그려지는 태그 + 게시판 데이터 영역
+  const SKIP = `script, style, noscript, template, iframe, option, ${boardDataSelector}`;
 
   // 1) 문구: 굵은 글씨 등으로 쪼개지지 않도록 가장 가까운 블록 요소 단위로 모은다(textContent 방식)
   const isInline = (el: Element) => getComputedStyle(el).display === 'inline';
@@ -85,6 +101,7 @@ function readItemsInPage(): RawItem[] {
 
   // 2) 버튼 글자 (<input type="button|submit">)
   for (const input of document.querySelectorAll<HTMLInputElement>('input[type="button"], input[type="submit"]')) {
+    if (input.closest(SKIP)) continue;
     const value = normalize(input.value);
     if (hasWords(value)) add(input, { kind: '문구', value });
   }
@@ -113,7 +130,7 @@ function readItemsInPage(): RawItem[] {
 
 /** 열린 페이지에서 이미지·문구를 읽는다 (collect.ts의 Extractor 자리에 들어간다) */
 export async function extractPageItems(page: Page, target: PageTarget): Promise<RawItem[]> {
-  void target; // 메뉴·주소는 수집 대상에 이미 있으므로 여기서는 쓰지 않는다(작업 9에서 게시판 판단에 쓸 예정)
   await scrollToBottom(page);
-  return page.evaluate(readItemsInPage);
+  const boardData = isBoardPage(target.url) ? BOARD_DATA_ON_BOARD_PAGE : BOARD_DATA_ALWAYS;
+  return page.evaluate(readItemsInPage, boardData);
 }
