@@ -1,7 +1,8 @@
 // [화면] 엑셀 만들기 — 6개 시트 (DESIGN.md 8장, PLAN 작업 20)
 // 시트: 안내 · 공통항목_요약 · 초등 · 중학 · 고교 · 수집 페이지 (PRD must 2: 6개로 고정)
 // 사용자 브라우저 안에서 만든다(서버 시간을 쓰지 않도록). [엑셀 다운로드]를 누를 때 불러온다.
-// 3과정 공통 노란색(작업 21), 실패 경고·실패 목록(작업 22), 파일 이름·다운로드(작업 23)는 다음 작업에서 더한다.
+// 3과정 공통 항목은 공통ID 칸을 노란색으로 칠한다(작업 21).
+// 실패 경고·실패 목록(작업 22), 파일 이름·다운로드(작업 23)는 다음 작업에서 더한다.
 //
 // scripts/에서도 불러올 수 있도록 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
@@ -24,6 +25,21 @@ export const SHEET_NAMES = ['안내', '공통항목_요약', '초등', '중학',
 
 const FONT = { name: '맑은 고딕', size: 10 };
 const HEADER_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+/** 3과정 공통 항목 표시 (PRD must 2: 노란색) */
+const ALL3_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+
+/** 3과정 모두에 있는 항목인지 */
+const inAllCourses = (g: Group) => g.courses.length === COURSES.length;
+
+/**
+ * 3과정 공통 항목 줄의 공통ID 칸(첫 칸)을 노란색으로 칠한다.
+ * rows는 시트에 넣은 순서 그대로의 묶음 목록(머리줄 다음 줄부터 한 줄씩 대응).
+ */
+function markAllCourses(ws: ExcelJS.Worksheet, groupOfRow: Group[]): void {
+  groupOfRow.forEach((g, i) => {
+    if (inAllCourses(g)) ws.getRow(i + 2).getCell(1).fill = ALL3_FILL;
+  });
+}
 
 /** 이용자가 직접 올린 그림인지 (그림 주소에 /upload/ 가 들어 있음 — 함께하기의 이용자 지도 썸네일 등) */
 export function isUserUploaded(group: Group): boolean {
@@ -68,7 +84,7 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput): void {
     ['수집 결과', `성공 ${results.filter((r) => r.status === '성공').length} · 실패 ${results.filter((r) => r.status !== '성공').length} / 전체 ${input.totalPages}페이지`],
     ['항목 수', `공통ID ${groups.length}개 — 3과정 공통 ${by(3)} · 2과정 공통 ${by(2)} · 한 과정만 ${by(1)}`],
     ['"같은 항목" 기준', '이미지: 파일 내용이 완전히 같으면 같은 그림으로 봅니다(파일 이름·경로가 달라도).\n문구: 띄어쓰기·줄바꿈을 정리한 뒤 글자가 완전히 같으면 같은 문구로 봅니다.'],
-    ['공통ID', '같은 그림·문구는 모든 시트에서 같은 공통ID(IMG-xxx / TXT-xxx)를 씁니다. 한 곳을 고치면 같은 ID의 다른 위치도 함께 고쳐야 합니다. 필터로 ID를 걸러 보세요.'],
+    ['공통ID', '같은 그림·문구는 모든 시트에서 같은 공통ID(IMG-xxx / TXT-xxx)를 씁니다. 한 곳을 고치면 같은 ID의 다른 위치도 함께 고쳐야 합니다. 필터로 ID를 걸러 보세요.\n공통ID 칸이 노란색이면 초등·중학·고교 3과정 모두에 있는 항목입니다.'],
     ['위치', '메뉴 · 페이지 주소 · 영역(상단/본문/하단) 3가지로 적었습니다. "숨김"은 탭·펼침 메뉴를 눌러야 보이는 항목입니다.'],
     ['시트 구성', '공통항목_요약: 공통ID 1개당 1줄, 과정별 위치 수 / 초등·중학·고교: 위치 1개당 1줄 / 수집 페이지: 수집한 페이지 목록'],
     ['비고 표시', '비교 불가: 그림 파일을 받지 못해 내용을 비교하지 못한 그림(주소가 같을 때만 같은 항목)\n이용자 등록 콘텐츠: 이용자가 올린 그림(현행화 대상과 구분)'],
@@ -103,11 +119,13 @@ function summaryRows(groups: Group[]) {
   });
 }
 
-/** 과정별 시트: 위치 1개당 1줄 (공통ID 순서 → 위치 순서) */
+/** 과정별 시트: 위치 1개당 1줄 (공통ID 순서 → 위치 순서). 줄마다 어느 묶음인지도 함께 돌려준다 */
 function courseRows(groups: Group[], course: Course) {
   const rows: Record<string, unknown>[] = [];
+  const groupOfRow: Group[] = [];
   for (const g of groups) {
     for (const l of g.locations.filter((loc: Location) => loc.course === course)) {
+      groupOfRow.push(g);
       const notes = [!g.comparable && '비교 불가', isUserUploaded(g) && '이용자 등록 콘텐츠'].filter(Boolean).join(' / ');
       rows.push({
         id: g.id,
@@ -124,7 +142,7 @@ function courseRows(groups: Group[], course: Course) {
       });
     }
   }
-  return rows;
+  return { rows, groupOfRow };
 }
 
 /** 6개 시트 엑셀 파일을 만들어 그 내용(바이트)을 돌려준다 */
@@ -135,7 +153,7 @@ export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
 
   addGuide(wb, input);
 
-  addTable(
+  const summarySheet = addTable(
     wb,
     '공통항목_요약',
     [
@@ -150,9 +168,11 @@ export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
     ],
     summaryRows(input.groups),
   );
+  markAllCourses(summarySheet, input.groups);
 
   for (const course of COURSES) {
-    addTable(
+    const { rows, groupOfRow } = courseRows(input.groups, course);
+    const courseSheet = addTable(
       wb,
       course,
       [
@@ -168,8 +188,9 @@ export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
         { header: '숨김 여부', key: 'hidden', width: 9 },
         { header: '비고', key: 'note', width: 20 },
       ],
-      courseRows(input.groups, course),
+      rows,
     );
+    markAllCourses(courseSheet, groupOfRow);
   }
 
   addTable(
