@@ -9,6 +9,7 @@ import type { Page } from 'playwright-core';
 import { PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
 import type { Batch, Course, PageTarget } from './types.ts';
 import { COURSES } from './types.ts';
+import { SITE_UNAVAILABLE_MESSAGE } from './site-check.ts';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from './url.ts';
 
 /** 묶음 하나에 넣는 최대 페이지 수 (DESIGN.md 2장 C안) */
@@ -16,9 +17,6 @@ export const MAX_PAGES_PER_BATCH = 6;
 
 /** 페이지와 페이지 사이에 쉬는 시간 (PRD must 1: 1초 이상) */
 const PAGE_GAP_MS = 1_000;
-
-/** 메인 페이지를 열지 못했을 때 보여 줄 안내 (DESIGN.md 9장) */
-export const SITE_UNAVAILABLE_MESSAGE = '사이트 접속 불가 — 잠시 후 다시 시도하세요';
 
 /** 메인 주소 속 과정 이름 → 과정 */
 const COURSE_BY_KEY: Record<string, Course> = { ele: '초등', mid: '중학', high: '고교' };
