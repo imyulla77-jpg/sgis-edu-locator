@@ -8,7 +8,8 @@
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import { isSiteUnavailable } from './site-check.ts';
-import type { Batch, PageResult } from './types.ts';
+import type { Batch, Course, PageResult } from './types.ts';
+import { COURSES } from './types.ts';
 
 /** 묶음과 묶음 사이에 쉬는 시간 (DESIGN.md 7장: 1초 이상) */
 export const BATCH_GAP_MS = 1_000;
@@ -19,6 +20,13 @@ const MAX_PAGES_PER_BATCH = 6;
 /** 묶음 하나를 수집해 페이지 결과를 돌려주는 함수 */
 export type SendBatch = (batch: Batch) => Promise<PageResult[]>;
 
+/** 과정 하나의 진행 상황 */
+export interface CourseProgress {
+  course: Course;
+  donePages: number;
+  totalPages: number;
+}
+
 /** 진행 상황 */
 export interface RunProgress {
   /** 결과를 받은 페이지 수 (다시 보낸 페이지는 한 번만 센다) */
@@ -27,6 +35,10 @@ export interface RunProgress {
   failedPages: number;
   /** 지금 보내는 묶음 이름. 예: "중학 > 주제보기" */
   current: string;
+  /** 지금 보내는 묶음의 페이지 수 */
+  currentPages: number;
+  /** 과정별 진행 상황 (초등 → 중학 → 고교) */
+  courses: CourseProgress[];
 }
 
 export interface RunOptions {
@@ -80,19 +92,28 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
   const { gapMs = BATCH_GAP_MS, onProgress } = options;
   const totalPages = batches.reduce((sum, b) => sum + b.pages.length, 0);
   const results: PageResult[] = [];
-  const report = (current: string) =>
+  const isDone = (r: PageResult) => r.status !== '시간 초과'; // 시간 초과는 다시 보내므로 아직 안 끝난 것으로 센다
+  const pagesOf = (course: Course) =>
+    batches.filter((b) => b.course === course).reduce((sum, b) => sum + b.pages.length, 0);
+  const report = (batch: Batch) =>
     onProgress?.({
-      donePages: results.filter((r) => r.status !== '시간 초과').length,
+      donePages: results.filter(isDone).length,
       totalPages,
       failedPages: results.filter((r) => r.status === '수집 실패').length,
-      current,
+      current: batch.label,
+      currentPages: batch.pages.length,
+      courses: COURSES.map((course) => ({
+        course,
+        donePages: results.filter((r) => r.target.course === course && isDone(r)).length,
+        totalPages: pagesOf(course),
+      })),
     });
 
   for (const [index, batch] of batches.entries()) {
     if (index > 0) await sleep(gapMs);
-    report(batch.label);
+    report(batch);
     results.push(...(await sendWithRetry(send, batch, gapMs)));
-    report(batch.label);
+    report(batch);
     if (isSiteUnavailable(results)) return { results, stoppedAsUnavailable: true };
   }
 
@@ -100,7 +121,7 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
   const timedOut = results.filter((r) => r.status === '시간 초과');
   for (const batch of rebatch(timedOut)) {
     await sleep(gapMs);
-    report(batch.label);
+    report(batch);
     const retried = await sendWithRetry(send, batch, gapMs);
     for (const result of retried) {
       const index = results.findIndex((r) => r.target.url === result.target.url && r.target.course === result.target.course);
@@ -109,7 +130,7 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
           ? { ...result, status: '수집 실패', error: '시간 초과 (다시 시도해도 같음)' }
           : result;
     }
-    report(batch.label);
+    report(batch);
   }
   return { results, stoppedAsUnavailable: false };
 }

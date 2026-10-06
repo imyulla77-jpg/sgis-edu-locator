@@ -1,10 +1,10 @@
 'use client';
 
-// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16)
-// 수집 중 화면(진행률)은 PLAN 작업 17, 결과 화면(요약·검색)은 작업 19에서 채운다.
-// 지금은 두 상태를 간단한 글자로만 보여 준다.
+// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘 (DESIGN.md 4장, PLAN 작업 16·17)
+// 결과 화면(요약·검색)은 PLAN 작업 19에서 채운다. 지금은 간단한 글자로만 보여 준다.
 
 import { useState } from 'react';
+import ProgressPanel from '@/components/ProgressPanel';
 import StartForm from '@/components/StartForm';
 import { collectAll } from '@/lib/collect-client';
 import type { RunProgress } from '@/lib/run-batches';
@@ -47,14 +47,7 @@ export default function Home() {
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
         {screen.kind === '시작' && <StartForm onStart={start} />}
 
-        {/* 임시 표시 — PLAN 작업 17에서 진행률 화면(ProgressPanel)으로 바뀐다 */}
-        {screen.kind === '수집 중' && (
-          <p aria-live="polite">
-            {screen.progress
-              ? `수집 중… ${screen.progress.donePages} / ${screen.progress.totalPages} 페이지 · 실패 ${screen.progress.failedPages}건`
-              : '메뉴를 읽는 중…'}
-          </p>
-        )}
+        {screen.kind === '수집 중' && <ProgressPanel progress={screen.progress} />}
 
         {/* 임시 표시 — PLAN 작업 19에서 결과 화면(요약·검색)으로 바뀐다 */}
         {screen.kind === '결과' && (
@@ -64,8 +57,9 @@ export default function Home() {
           </p>
         )}
 
+        {/* 처음 3페이지 연속 실패·메뉴 읽기 실패 등: 진행 영역이 빨간 안내와 [처음으로]로 바뀐다(DESIGN.md 4.2장) */}
         {screen.kind === '오류' && (
-          <div role="alert" className="flex flex-col gap-4">
+          <div role="alert" className="flex flex-col gap-4 rounded-md bg-red-50 p-4 dark:bg-red-950/40">
             <p className="font-medium text-red-600">⚠ {screen.message}</p>
             <button
               type="button"

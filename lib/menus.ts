@@ -45,6 +45,12 @@ const COURSE_BY_KEY: Record<string, Course> = { ele: '초등', mid: '중학', hi
 export interface TopMenu {
   name: string;
   subs: { name: string; url: string }[];
+  /**
+   * 링크는 있는데 아직 주소·이름이 없는 하위 메뉴 수.
+   * 초등 수업하기처럼 처음엔 "1, 2, 3" 자리표시 링크였다가 잠시 뒤 채워지는 메뉴가 있어서,
+   * 0보다 크면 "덜 그려짐"으로 보고 더 기다린다.
+   */
+  pending: number;
 }
 
 /** 수집 묶음 목록을 만들 때 생길 수 있는 오류. message는 화면에 그대로 보여 줘도 되는 문장이다 */
@@ -57,21 +63,27 @@ export class MenuError extends Error {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 메뉴가 다 채워졌는지 확인할 때 두 번 읽는 간격과, 같은 결과가 나올 때까지 기다리는 최대 시간 */
+/** 메뉴가 다 채워졌는지 확인할 때 다시 읽는 간격과, 다 채워질 때까지 기다리는 최대 시간 */
 const STABLE_CHECK_GAP_MS = 500;
-const STABLE_MAX_MS = 5_000;
+const STABLE_MAX_MS = 10_000;
 
 /**
- * 같은 결과가 두 번 연속 나올 때까지 0.5초 간격으로 읽는다(최대 5초).
- * 메뉴 이름 일부는 페이지가 열린 뒤 채워지므로, 덜 채워진 메뉴를 읽지 않기 위함.
+ * 0.5초 간격으로 읽어, "덜 그려짐이 아니고(isEmpty가 false) 직전과 같은 결과"가 나오면 확정한다(최대 10초).
+ * 메뉴 이름·주소 일부는 페이지가 열린 뒤 채워지므로, 덜 채워진 메뉴를 읽지 않기 위함.
+ * 시간이 다 되면 마지막으로 읽은 내용을 돌려준다.
  */
-async function readWhenStable<T>(page: Page, read: (page: Page) => Promise<T>, maxMs: number): Promise<T> {
+async function readWhenStable<T>(
+  page: Page,
+  read: (page: Page) => Promise<T>,
+  isEmpty: (value: T) => boolean,
+  maxMs: number,
+): Promise<T> {
   const until = Date.now() + Math.min(STABLE_MAX_MS, maxMs);
   let previous = await read(page);
   while (Date.now() < until) {
     await sleep(STABLE_CHECK_GAP_MS);
     const current = await read(page);
-    if (JSON.stringify(current) === JSON.stringify(previous)) return current;
+    if (!isEmpty(current) && JSON.stringify(current) === JSON.stringify(previous)) return current;
     previous = current;
   }
   return previous;
@@ -104,7 +116,7 @@ async function openAndRead<T>(
     try {
       const started = Date.now();
       await openPage(page, url, waitMs);
-      lastRead = { value: await readWhenStable(page, read, waitMs - (Date.now() - started)) };
+      lastRead = { value: await readWhenStable(page, read, isEmpty, waitMs - (Date.now() - started)) };
       if (!isEmpty(lastRead.value)) return lastRead.value;
     } catch {
       // 열리지 않음 → 다음 시도로 넘어간다
@@ -153,9 +165,12 @@ async function readTopMenus(page: Page): Promise<TopMenu[]> {
       const subs = menu.subs
         .map((s) => ({ name: s.name, url: toUrl(s.link) }))
         .filter((s): s is { name: string; url: string } => Boolean(s.name && s.url));
-      // 하위 메뉴가 없으면 상단 메뉴 링크 자체를 수집 대상으로 쓴다
+      const pending = menu.subs.length - subs.length;
+      // 하위 메뉴 링크가 아예 없으면 상단 메뉴 링크 자체를 수집 대상으로 쓴다
+      // (하위 메뉴가 아직 채워지는 중이면 상단 링크로 대신하지 않는다 — pending으로 다시 읽게 함)
       const topUrl = toUrl(menu.topLink);
-      return { name: menu.name, subs: subs.length > 0 ? subs : topUrl ? [{ name: menu.name, url: topUrl }] : [] };
+      const fallback = menu.subs.length === 0 && topUrl ? [{ name: menu.name, url: topUrl }] : [];
+      return { name: menu.name, subs: subs.length > 0 ? subs : fallback, pending };
     });
 }
 
@@ -248,11 +263,15 @@ export async function loadBatches(
           page,
           mains[course],
           readTopMenus,
-          (menus) => menus.length === 0,
+          (menus) => menus.length === 0 || menus.some((m) => m.pending > 0),
           timing,
           onRetry,
         );
         if (menusByCourse[course].length === 0) throw new MenuError(`${course} 메인에서 상단 메뉴를 읽지 못했어요`);
+        // 다시 시도해도 덜 채워진 메뉴가 있으면, 수집 대상을 빠뜨린 채 진행하지 않고 멈춘다
+        if (menusByCourse[course].some((m) => m.pending > 0)) {
+          throw new MenuError(`${course} 메인의 메뉴가 다 표시되지 않았어요 — 잠시 후 다시 시도하세요`);
+        }
       }
 
       const batches = buildBatches(mains, menusByCourse);
