@@ -1,14 +1,16 @@
-// [화면] 같은 항목 묶기 — 순수 계산 (DESIGN.md 5장 ④·6장, PLAN 작업 11)
-// 수집 결과(PageResult[])를 받아 같은 문구끼리 묶는다.
-// 이미지 묶기(파일 지문 기준)와 공통ID 매기기는 PLAN 작업 12에서 이 파일에 더한다.
+// [화면] 같은 항목 묶기·공통ID — 순수 계산 (DESIGN.md 5장 ④·6장, PLAN 작업 11·12)
+// 수집 결과(PageResult[])를 받아
+//  - 문구는 정리한 글자가 완전히 같을 때 (작업 11)
+//  - 이미지는 파일 지문이 같을 때, 지문이 없으면("비교 불가") 그림 주소가 완전히 같을 때 (작업 12)
+// 같은 항목으로 묶고, 공통ID(IMG-001 / TXT-001)를 매긴다 (작업 12).
 //
 // 브라우저 없이 계산만 하므로 화면에서도, scripts/에서도 불러올 수 있다.
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
-import type { Course, Group, Location, PageResult } from './types.ts';
+import type { Course, Group, ItemKind, Location, PageResult, RawItem } from './types.ts';
 import { COURSES } from './types.ts';
 
-/** 공통ID를 매기기 전의 묶음 (작업 12에서 id를 붙여 Group이 된다) */
+/** 공통ID를 매기기 전의 묶음 */
 export type DraftGroup = Omit<Group, 'id'>;
 
 /**
@@ -22,6 +24,36 @@ export function normalizeText(text: string): string {
 /** 한글·영문이 하나도 없는 글자(숫자·기호만)는 버린다 */
 function hasWords(text: string): boolean {
   return /[가-힣A-Za-z]/.test(text);
+}
+
+/** 그림 주소에서 화면에 보여 줄 파일 이름을 꺼낸다. 예: .../images/logo.png?v=1 → logo.png */
+export function imageFileName(url: string): string {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop() ?? url;
+    return decodeURIComponent(last);
+  } catch {
+    return url;
+  }
+}
+
+/** 항목 하나의 묶는 기준과 처음 만들 묶음. 묶지 않는 항목이면 null */
+function draftOf(item: RawItem): DraftGroup | null {
+  if (item.kind === '문구') {
+    const text = normalizeText(item.value);
+    if (!hasWords(text)) return null;
+    return { kind: '문구', key: `T:${text}`, display: text, comparable: true, courses: [], locations: [] };
+  }
+  // 이미지: 지문이 있으면 지문으로, 없으면("비교 불가") 주소가 완전히 같을 때만 같은 항목
+  return {
+    kind: '이미지',
+    key: item.hash ? `I:${item.hash}` : `U:${item.value}`,
+    display: imageFileName(item.value),
+    imageUrl: item.value,
+    alt: item.alt || undefined,
+    comparable: Boolean(item.hash),
+    courses: [],
+    locations: [],
+  };
 }
 
 /**
@@ -44,29 +76,63 @@ function addLocation(group: DraftGroup, location: Location): void {
   }
 }
 
-/**
- * 수집 결과에서 문구를 같은 것끼리 묶는다.
- * - 묶는 기준: 'T:' + 정리한 글자 (글자가 완전히 같을 때만 같은 항목)
- * - "성공"한 페이지의 항목만 쓴다
- * - 묶음 순서는 처음 나온 순서 (공통 범위별 정렬은 작업 12에서)
- */
-export function groupTexts(results: PageResult[]): DraftGroup[] {
-  const groups = new Map<string, DraftGroup>();
+/** 수집 결과를 처음 나온 순서대로 훑으며 묶는다. "성공"한 페이지의 항목만 쓴다 */
+function draftGroups(results: PageResult[], kinds: ItemKind[]): DraftGroup[] {
+  const groups = new Map<string, DraftGroup>(); // Map은 넣은 순서 = 처음 나온 순서를 지킨다
   for (const result of results) {
     if (result.status !== '성공') continue;
     const { course, menu, url } = result.target;
     for (const item of result.items) {
-      if (item.kind !== '문구') continue;
-      const text = normalizeText(item.value);
-      if (!hasWords(text)) continue;
-      const key = `T:${text}`;
-      let group = groups.get(key);
+      if (!kinds.includes(item.kind)) continue;
+      const draft = draftOf(item);
+      if (!draft) continue;
+      let group = groups.get(draft.key);
       if (!group) {
-        group = { kind: '문구', key, display: text, comparable: true, courses: [], locations: [] };
-        groups.set(key, group);
+        group = draft;
+        groups.set(draft.key, group);
+      } else if (draft.alt && !group.alt) {
+        group.alt = draft.alt; // 대체텍스트는 처음 발견된 것을 쓴다
       }
       addLocation(group, { course, menu, url, region: item.region, hidden: item.hidden });
     }
   }
   return [...groups.values()];
+}
+
+/** 문구만 묶는다 (작업 11). 공통ID는 매기지 않는다 */
+export function groupTexts(results: PageResult[]): DraftGroup[] {
+  return draftGroups(results, ['문구']);
+}
+
+/** 이미지만 묶는다 (작업 12). 공통ID는 매기지 않는다 */
+export function groupImages(results: PageResult[]): DraftGroup[] {
+  return draftGroups(results, ['이미지']);
+}
+
+/**
+ * 이미지와 문구를 모두 묶고 공통ID를 매긴다 (작업 12).
+ * 순서(= 공통ID 매기는 순서, DESIGN.md 6장):
+ *   1. 있는 과정 수가 많은 것부터 (3과정 공통 → 2과정 → 한 과정만)
+ *   2. 그 안에서 이미지 → 문구
+ *   3. 그 안에서 처음 나온 순서
+ * 공통ID는 이미지와 문구를 따로 센다: IMG-001, IMG-002 … / TXT-001, TXT-002 …
+ */
+export function buildGroups(results: PageResult[]): Group[] {
+  const drafts = draftGroups(results, ['이미지', '문구']);
+  const firstSeen = new Map(drafts.map((d, i) => [d, i]));
+  const kindOrder = (k: ItemKind) => (k === '이미지' ? 0 : 1);
+  const sorted = [...drafts].sort(
+    (a, b) =>
+      b.courses.length - a.courses.length ||
+      kindOrder(a.kind) - kindOrder(b.kind) ||
+      firstSeen.get(a)! - firstSeen.get(b)!,
+  );
+
+  let imageCount = 0;
+  let textCount = 0;
+  return sorted.map((draft) => {
+    const number = draft.kind === '이미지' ? ++imageCount : ++textCount;
+    const prefix = draft.kind === '이미지' ? 'IMG' : 'TXT';
+    return { id: `${prefix}-${String(number).padStart(3, '0')}`, ...draft };
+  });
 }
