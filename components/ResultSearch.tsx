@@ -1,6 +1,7 @@
 'use client';
 
-// 결과 검색 — 검색창·필터 2개·결과 표 (DESIGN.md 4.3장, PLAN 작업 19)
+// 결과 검색 — 검색창·필터·결과 표 (DESIGN.md 4.3·17장, PLAN 작업 19·27)
+// 지난 결과와 비교했으면 "변화" 필터(전체 / 새로 생김)와 "새로 생김" 표시가 더해진다.
 
 import { useMemo, useState } from 'react';
 import { MAX_SHOWN, MIN_QUERY_LENGTH, searchGroups, type KindFilter, type ScopeFilter } from '@/lib/search';
@@ -11,12 +12,27 @@ const LOCATIONS_PREVIEW = 3;
 
 const SHORT: Record<Course, string> = { 초등: '초', 중학: '중', 고교: '고' };
 
-export default function ResultSearch({ groups }: { groups: Group[] }) {
+type ChangeFilter = '전체' | '새로 생김';
+
+interface ResultSearchProps {
+  groups: Group[];
+  /** 지난 결과와 비교했으면 새로 생긴 항목의 공통ID (PLAN 작업 27) */
+  addedIds?: string[];
+}
+
+export default function ResultSearch({ groups, addedIds }: ResultSearchProps) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('전체');
   const [scope, setScope] = useState<ScopeFilter>('전체');
+  const [change, setChange] = useState<ChangeFilter>('전체');
 
-  const output = useMemo(() => searchGroups(groups, { query, kind, scope }), [groups, query, kind, scope]);
+  const added = useMemo(() => new Set(addedIds ?? []), [addedIds]);
+  // 비교를 지우면 "새로 생김" 필터도 풀린다
+  const onlyAdded = addedIds !== undefined && change === '새로 생김';
+  const output = useMemo(
+    () => searchGroups(onlyAdded ? groups.filter((g) => added.has(g.id)) : groups, { query, kind, scope }),
+    [groups, onlyAdded, added, query, kind, scope],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,6 +51,9 @@ export default function ResultSearch({ groups }: { groups: Group[] }) {
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Radios label="구분" name="kind" value={kind} options={['전체', '이미지', '문구']} onChange={setKind} />
           <Radios label="과정" name="scope" value={scope} options={['전체', '3과정 공통']} onChange={setScope} />
+          {addedIds !== undefined && (
+            <Radios label="변화" name="change" value={change} options={['전체', '새로 생김']} onChange={setChange} />
+          )}
         </div>
       </div>
 
@@ -62,7 +81,7 @@ export default function ResultSearch({ groups }: { groups: Group[] }) {
                 </thead>
                 <tbody>
                   {output.shown.map((g) => (
-                    <ResultRow key={g.id} group={g} />
+                    <ResultRow key={g.id} group={g} isNew={added.has(g.id)} />
                   ))}
                 </tbody>
               </table>
@@ -74,14 +93,21 @@ export default function ResultSearch({ groups }: { groups: Group[] }) {
   );
 }
 
-function ResultRow({ group }: { group: Group }) {
+function ResultRow({ group, isNew }: { group: Group; isNew: boolean }) {
   const all3 = group.courses.length === 3;
   return (
     <tr className="border-b border-zinc-200 align-top dark:border-zinc-800">
       <td className="py-2 pr-3 font-mono whitespace-nowrap">
         <span className={all3 ? 'rounded bg-yellow-100 px-1 dark:bg-yellow-900/50' : undefined}>{group.id}</span>
       </td>
-      <td className="py-2 pr-3 whitespace-nowrap">{group.kind}</td>
+      <td className="py-2 pr-3 whitespace-nowrap">
+        {group.kind}
+        {isNew && (
+          <span className="mt-1 block w-fit rounded bg-green-100 px-1 text-xs text-green-800 dark:bg-green-900/50 dark:text-green-300">
+            새로 생김
+          </span>
+        )}
+      </td>
       <td className="max-w-xs py-2 pr-3 break-words">
         {group.kind === '이미지' ? (
           <>

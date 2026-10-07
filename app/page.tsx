@@ -1,15 +1,17 @@
 'use client';
 
-// 메인 화면 — 시작 → (메뉴 선택) → 수집 중 → 결과 상태 전환, 수집 지휘, 엑셀 다운로드
-// (DESIGN.md 4·15장, PLAN 작업 16~19·23·25)
+// 메인 화면 — 시작 → (메뉴 선택) → 수집 중 → 결과(지난 결과와 비교) 상태 전환, 수집 지휘, 엑셀 다운로드
+// (DESIGN.md 4·15·17장, PLAN 작업 16~19·23·25·27)
 
 import { useEffect, useState } from 'react';
 import MenuPicker from '@/components/MenuPicker';
+import PastCompare from '@/components/PastCompare';
 import ProgressPanel from '@/components/ProgressPanel';
 import ResultSearch from '@/components/ResultSearch';
 import ResultSummary from '@/components/ResultSummary';
 import StartForm, { type CollectMode } from '@/components/StartForm';
 import { collectBatches, fetchBatches } from '@/lib/collect-client';
+import type { Comparison } from '@/lib/compare';
 import { downloadExcel } from '@/lib/download';
 import { buildGroups } from '@/lib/group';
 import { pickBatches } from '@/lib/menu-select';
@@ -31,6 +33,8 @@ type Screen =
       collectedAt: Date;
       /** 메뉴를 골라 수집했으면 고른 상단 메뉴, 전체 수집이면 없음 */
       menus?: string[];
+      /** 지난 결과 엑셀과 비교했으면 그 결과 (PLAN 작업 27) */
+      comparison?: Comparison;
     }
   | { kind: '오류'; message: string };
 
@@ -150,8 +154,14 @@ export default function Home() {
               onDownload={download}
               downloadLabel={downloadLabel}
             />
+            <PastCompare
+              groups={screen.groups}
+              partial={screen.menus !== undefined}
+              comparison={screen.comparison}
+              onCompared={(comparison) => setScreen({ ...screen, comparison })}
+            />
             <hr className="border-zinc-200 dark:border-zinc-800" />
-            <ResultSearch groups={screen.groups} />
+            <ResultSearch groups={screen.groups} addedIds={screen.comparison?.addedIds} />
             <button
               type="button"
               onClick={recollect}

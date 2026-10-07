@@ -5,10 +5,13 @@
 // 수집 실패 페이지가 있으면 "안내" 시트 맨 위에 실패 목록을 적는다(작업 22).
 // 다운로드 전 경고 문장·파일 이름·다운로드는 lib/download.ts(작업 22·23).
 // 미리보기 그림이 주어지면 공통항목_요약 시트의 "미리보기" 칸에 넣는다(작업 26, 담당자 결정: 요약 시트에만, 긴 변 60픽셀).
+// 공통항목_요약 시트 맨 끝에 숨긴 "비교 기준" 열을 두고, 지난 결과와 비교했으면 "지난 결과 대비" 열과
+// 안내 시트의 사라진 항목 목록을 넣는다(작업 27, 담당자 결정: 숨긴 열, 화면 + 엑셀).
 //
 // scripts/에서도 불러올 수 있도록 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import ExcelJS from 'exceljs';
+import type { Comparison } from './compare.ts';
 import type { Course, Group, Location, PageResult } from './types.ts';
 import { COURSES } from './types.ts';
 
@@ -24,6 +27,8 @@ export interface ExcelInput {
   menus?: string[];
   /** 그림 주소 → 미리보기 PNG (PLAN 작업 26). 없으면 미리보기 칸을 비워 둔다. null = 받지 못함 */
   thumbnails?: Map<string, ExcelThumbnail | null>;
+  /** 지난 수집 결과와 비교한 결과 (PLAN 작업 27). 없으면 비교 표시를 하지 않는다 */
+  comparison?: Comparison;
 }
 
 /** 엑셀에 넣을 미리보기 그림 (lib/thumbnail.ts의 Thumbnail과 같은 모양) */
@@ -155,6 +160,15 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput, preview: ReturnType<t
         : '이 파일에는 그림 미리보기가 없습니다. 그림은 "이미지 주소"를 눌러 보세요.',
     ],
     ['주의', '크기나 색만 다른 같은 그림은 다른 그림으로 처리됩니다. 따로 확인하세요.\n이 파일은 내부용입니다. 인터넷에 공개하지 마세요.'],
+    [
+      '지난 결과와 비교',
+      input.comparison
+        ? `${input.comparison.past.collectedAt || '날짜 모름'} 조사(${input.comparison.past.fileName})와 비교: 새로 생김 ${input.comparison.addedIds.length}개 · 사라짐 ${input.comparison.removed.length}개.\n` +
+          '새로 생긴 항목은 공통항목_요약 시트의 "지난 결과 대비" 열에 "새로 생김"으로, 사라진 항목은 이 시트 맨 아래에 적었습니다.' +
+          (input.comparison.past.hasKeys ? '' : '\n지난 파일에 비교 기준이 없어 그림은 주소로 비교했습니다. 파일 이름만 바뀐 같은 그림은 새로 생김·사라짐으로 보일 수 있습니다.') +
+          (input.comparison.partial ? '\n이번이나 지난번에 일부 메뉴만 수집해서 "사라짐"이 정확하지 않을 수 있습니다.' : '')
+        : '이 파일은 지난 결과와 비교하지 않았습니다. 다음 현행화 때 이 파일을 올리면 바뀐 항목을 볼 수 있습니다(공통항목_요약 시트의 숨긴 "비교 기준" 열 사용).',
+    ],
   ];
   ws.addRow(['SGIS에듀 3과정 이미지·문구 위치']);
   ws.addRow([]);
@@ -171,6 +185,15 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput, preview: ReturnType<t
   }
 
   for (const line of lines) ws.addRow(line);
+
+  // 지난번에는 있었는데 이번에 없는 항목 (PLAN 작업 27)
+  const removed = input.comparison?.removed ?? [];
+  if (removed.length > 0) {
+    ws.addRow([]);
+    redRows.add(ws.addRow([`사라진 항목 ${removed.length}개`, '지난번에는 있었는데 이번 수집에는 없는 그림·문구입니다 (구분 · 내용 · 있던 과정)']).number);
+    for (const item of removed) ws.addRow([item.kind, `${item.display}${item.courses ? `  (${item.courses})` : ''}`]);
+  }
+
   ws.eachRow((row, n) =>
     row.eachCell((cell, colNumber) => {
       cell.font =
@@ -183,7 +206,8 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput, preview: ReturnType<t
 }
 
 /** 공통항목_요약 시트: 공통ID 1개당 1줄, 과정별 위치 수는 "N곳" (Q-a 나) */
-function summaryRows(groups: Group[], preview: ReturnType<typeof planThumbnails>) {
+function summaryRows(groups: Group[], preview: ReturnType<typeof planThumbnails>, comparison?: Comparison) {
+  const added = new Set(comparison?.addedIds ?? []);
   return groups.map((g) => {
     const count = (c: Course) => g.locations.filter((l) => l.course === c).length;
     const cell = (c: Course) => (count(c) > 0 ? `${count(c)}곳` : '');
@@ -199,6 +223,9 @@ function summaryRows(groups: Group[], preview: ReturnType<typeof planThumbnails>
       ele: cell('초등'),
       mid: cell('중학'),
       high: cell('고교'),
+      change: added.has(g.id) ? '새로 생김' : '',
+      // 다음 비교 때 쓰는 기준: 그림은 파일 지문, 문구는 글자 (숨긴 열)
+      key: g.key,
     };
   });
 }
@@ -251,10 +278,14 @@ export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
       { header: '초등 위치 수', key: 'ele', width: 11 },
       { header: '중학 위치 수', key: 'mid', width: 11 },
       { header: '고교 위치 수', key: 'high', width: 11 },
+      ...(input.comparison ? [{ header: '지난 결과 대비', key: 'change', width: 13 }] : []),
+      { header: '비교 기준', key: 'key', width: 20 },
     ],
-    summaryRows(input.groups, preview),
+    summaryRows(input.groups, preview, input.comparison),
   );
   markAllCourses(summarySheet, input.groups);
+  // 비교 기준 열은 다음 비교 때 앱이 읽는 값이라 작업자에게는 숨긴다
+  summarySheet.getColumn('key').hidden = true;
 
   // 미리보기 그림을 "미리보기" 칸 위에 얹는다(공통ID 1개당 그림 1개)
   input.groups.forEach((g, i) => {
