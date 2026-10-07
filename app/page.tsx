@@ -36,7 +36,8 @@ type Screen =
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>({ kind: '시작' });
-  const [downloading, setDownloading] = useState(false);
+  /** 엑셀을 받는 중이면 버튼에 보여 줄 진행 글자, 아니면 null */
+  const [downloadLabel, setDownloadLabel] = useState<string | null>(null);
 
   // 수집 중·결과 화면에서 창을 닫거나 새로고침하려 하면 브라우저 기본 경고창을 띄운다 (PRD Q7, DESIGN.md 9장)
   // 결과는 브라우저 메모리에만 있어서 창을 닫으면 사라지기 때문.
@@ -95,17 +96,20 @@ export default function Home() {
     }
   };
 
-  // [엑셀 다운로드]: 실패 페이지가 있으면 확인창 → 엑셀 만들기 → 내려받기 (PRD must 2, DESIGN.md 8장)
+  // [엑셀 다운로드]: 실패 페이지가 있으면 확인창 → 그림 미리보기 준비 → 엑셀 만들기 → 내려받기
+  // (PRD must 2·nice 2, DESIGN.md 8·16장)
   const download = async () => {
-    if (screen.kind !== '결과' || downloading) return;
-    setDownloading(true);
+    if (screen.kind !== '결과' || downloadLabel) return;
+    setDownloadLabel('엑셀 만드는 중…');
     try {
-      await downloadExcel(screen);
+      await downloadExcel(screen, (status) =>
+        setDownloadLabel(status.step === '그림 준비' ? `그림 준비 중… ${status.done}/${status.total}` : '엑셀 만드는 중…'),
+      );
     } catch (error) {
       console.error('[엑셀 다운로드]', error);
       window.alert('엑셀을 만드는 중 문제가 생겼어요. 다시 시도해 주세요.');
     } finally {
-      setDownloading(false);
+      setDownloadLabel(null);
     }
   };
 
@@ -144,7 +148,7 @@ export default function Home() {
               groups={screen.groups}
               menus={screen.menus}
               onDownload={download}
-              downloading={downloading}
+              downloadLabel={downloadLabel}
             />
             <hr className="border-zinc-200 dark:border-zinc-800" />
             <ResultSearch groups={screen.groups} />

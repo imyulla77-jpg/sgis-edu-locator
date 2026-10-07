@@ -1,6 +1,6 @@
-// [화면] 엑셀 다운로드 도우미 (DESIGN.md 4.3·8·9장, PLAN 작업 22·23)
+// [화면] 엑셀 다운로드 도우미 (DESIGN.md 4.3·8·9·16장, PLAN 작업 22·23·26)
 // 엑셀 도구(exceljs)를 불러오지 않는 가벼운 파일이라, 화면이 처음부터 불러와도 무겁지 않다.
-// 엑셀 도구는 [엑셀 다운로드]를 누를 때 downloadExcel 안에서 불러온다(DESIGN.md 3장).
+// 엑셀 도구와 미리보기 만들기는 [엑셀 다운로드]를 누를 때 downloadExcel 안에서 불러온다(DESIGN.md 3장).
 
 import type { ExcelInput } from './excel.ts';
 import type { PageResult } from './types.ts';
@@ -36,16 +36,30 @@ function saveFile(bytes: ArrayBuffer, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** 다운로드 진행 상황 (버튼 글자에 씀) */
+export type DownloadStatus = { step: '그림 준비'; done: number; total: number } | { step: '엑셀 만들기' };
+
 /**
- * [엑셀 다운로드]: 실패 페이지가 있으면 먼저 확인창을 띄우고, 엑셀을 만들어 내려받는다.
+ * [엑셀 다운로드]: 실패 페이지가 있으면 먼저 확인창을 띄우고,
+ * 그림 미리보기를 만든 뒤(PLAN 작업 26) 엑셀을 만들어 내려받는다.
  * 확인창에서 취소하면 false, 내려받기를 시작하면 true.
  */
-export async function downloadExcel(input: ExcelInput): Promise<boolean> {
+export async function downloadExcel(
+  input: ExcelInput,
+  onStatus?: (status: DownloadStatus) => void,
+): Promise<boolean> {
   const warning = failureWarning(input.results);
   if (warning && !window.confirm(warning)) return false;
 
+  // 그림 묶음의 미리보기(긴 변 60픽셀) — 실패한 그림은 엑셀에 "미리보기 없음"
+  const { makeThumbnails } = await import('./thumbnail.ts');
+  const imageUrls = input.groups.filter((g) => g.kind === '이미지' && g.imageUrl).map((g) => g.imageUrl!);
+  onStatus?.({ step: '그림 준비', done: 0, total: imageUrls.length });
+  const thumbnails = await makeThumbnails(imageUrls, (done, total) => onStatus?.({ step: '그림 준비', done, total }));
+
+  onStatus?.({ step: '엑셀 만들기' });
   const { buildWorkbook } = await import('./excel.ts'); // 이때 처음 엑셀 도구를 불러온다
-  const bytes = await buildWorkbook(input);
+  const bytes = await buildWorkbook({ ...input, thumbnails });
   saveFile(bytes, excelFileName());
   return true;
 }

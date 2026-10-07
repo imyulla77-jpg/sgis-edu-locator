@@ -12,7 +12,7 @@ interface ResultSummaryProps {
   groups: Group[];
   onDownload?: () => void;
   /** 엑셀을 만드는 중이면 true */
-  downloading?: boolean;
+  downloadLabel?: string | null;
   /** 메뉴를 골라 수집했으면 고른 상단 메뉴 (PLAN 작업 25) */
   menus?: string[];
 }
@@ -22,7 +22,7 @@ export default function ResultSummary({
   totalPages,
   groups,
   onDownload,
-  downloading = false,
+  downloadLabel = null,
   menus,
 }: ResultSummaryProps) {
   const failed = results.filter((r) => r.status !== '성공');
@@ -50,11 +50,11 @@ export default function ResultSummary({
         <button
           type="button"
           onClick={onDownload}
-          disabled={!onDownload || downloading}
-          aria-busy={downloading}
+          disabled={!onDownload || downloadLabel !== null}
+          aria-busy={downloadLabel !== null}
           className="rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
         >
-          {downloading ? '엑셀 만드는 중…' : '엑셀 다운로드'}
+          {downloadLabel ?? '엑셀 다운로드'}
         </button>
       </div>
 
