@@ -55,6 +55,18 @@ export async function sendBatch(batch: Batch, base = ''): Promise<PageResult[]> 
 }
 
 /**
+ * 이미 받은 묶음 목록(전체 또는 고른 메뉴만)을 서버 API로 차례로 수집한다 (PLAN 작업 25: 메뉴 골라서 수집).
+ */
+export async function collectBatches(
+  batches: Batch[],
+  options: RunOptions & { base?: string } = {},
+): Promise<RunOutcome & { totalPages: number }> {
+  const { base = '', ...runOptions } = options;
+  const outcome = await runBatches(batches, (batch) => sendBatch(batch, base), runOptions);
+  return { ...outcome, totalPages: batches.reduce((sum, b) => sum + b.pages.length, 0) };
+}
+
+/**
  * 15c: 시작 주소부터 전체 수집까지.
  * 묶음 목록을 받으면 onBatches로 알리고, 진행 상황은 onProgress로 알린다.
  * 메뉴 읽기가 실패하면 CollectRequestError(안내 문장 포함)를 던진다.

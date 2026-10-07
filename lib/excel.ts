@@ -19,6 +19,8 @@ export interface ExcelInput {
   totalPages: number;
   results: PageResult[];
   groups: Group[];
+  /** 메뉴를 골라 수집했으면 고른 상단 메뉴 (PLAN 작업 25). 전체 수집이면 없음 */
+  menus?: string[];
 }
 
 /** 시트 이름 (순서대로) */
@@ -81,7 +83,12 @@ function addGuide(wb: ExcelJS.Workbook, input: ExcelInput): void {
   const lines: [string, string][] = [
     ['조사 일시', input.collectedAt.toLocaleString('ko-KR')],
     ['대상 주소', input.startUrl],
-    ['조사 범위', `초등·중학·고교 메인과, 3과정 모두에 있는 상단 메뉴의 하위 메뉴 전부 (${input.totalPages}페이지). 게시판 글은 수집하지 않았습니다.`],
+    [
+      '조사 범위',
+      input.menus
+        ? `일부 메뉴만 수집: ${input.menus.join(' · ')} (초등·중학·고교, ${input.totalPages}페이지). 다른 메뉴의 위치는 이 파일에 없습니다. 게시판 글은 수집하지 않았습니다.`
+        : `초등·중학·고교 메인과, 3과정 모두에 있는 상단 메뉴의 하위 메뉴 전부 (${input.totalPages}페이지). 게시판 글은 수집하지 않았습니다.`,
+    ],
     ['수집 결과', `성공 ${results.filter((r) => r.status === '성공').length} · 실패 ${results.filter((r) => r.status !== '성공').length} / 전체 ${input.totalPages}페이지`],
     ['항목 수', `공통ID ${groups.length}개 — 3과정 공통 ${by(3)} · 2과정 공통 ${by(2)} · 한 과정만 ${by(1)}`],
     ['"같은 항목" 기준', '이미지: 파일 내용이 완전히 같으면 같은 그림으로 봅니다(파일 이름·경로가 달라도).\n문구: 띄어쓰기·줄바꿈을 정리한 뒤 글자가 완전히 같으면 같은 문구로 봅니다.'],

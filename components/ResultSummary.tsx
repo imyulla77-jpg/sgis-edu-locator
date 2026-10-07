@@ -13,9 +13,18 @@ interface ResultSummaryProps {
   onDownload?: () => void;
   /** 엑셀을 만드는 중이면 true */
   downloading?: boolean;
+  /** 메뉴를 골라 수집했으면 고른 상단 메뉴 (PLAN 작업 25) */
+  menus?: string[];
 }
 
-export default function ResultSummary({ results, totalPages, groups, onDownload, downloading = false }: ResultSummaryProps) {
+export default function ResultSummary({
+  results,
+  totalPages,
+  groups,
+  onDownload,
+  downloading = false,
+  menus,
+}: ResultSummaryProps) {
   const failed = results.filter((r) => r.status !== '성공');
   const byCourses = (n: number) => groups.filter((g) => g.courses.length === n).length;
   const fmt = (n: number) => n.toLocaleString('ko-KR');
@@ -32,6 +41,11 @@ export default function ResultSummary({ results, totalPages, groups, onDownload,
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             3과정 공통 {fmt(byCourses(COURSES.length))} · 2과정 공통 {fmt(byCourses(2))} · 한 과정만 {fmt(byCourses(1))}
           </p>
+          {menus && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              ⓘ 일부 메뉴만 수집했어요: {menus.join(' · ')} — 다른 메뉴의 위치는 이 결과에 없어요
+            </p>
+          )}
         </div>
         <button
           type="button"

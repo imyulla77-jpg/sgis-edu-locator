@@ -1,21 +1,25 @@
 'use client';
 
-// 메인 화면 — 시작 → 수집 중 → 결과 상태 전환, 수집 지휘, 엑셀 다운로드 (DESIGN.md 4장, PLAN 작업 16~19·23)
+// 메인 화면 — 시작 → (메뉴 선택) → 수집 중 → 결과 상태 전환, 수집 지휘, 엑셀 다운로드
+// (DESIGN.md 4·15장, PLAN 작업 16~19·23·25)
 
 import { useEffect, useState } from 'react';
+import MenuPicker from '@/components/MenuPicker';
 import ProgressPanel from '@/components/ProgressPanel';
 import ResultSearch from '@/components/ResultSearch';
 import ResultSummary from '@/components/ResultSummary';
-import StartForm from '@/components/StartForm';
-import { collectAll } from '@/lib/collect-client';
+import StartForm, { type CollectMode } from '@/components/StartForm';
+import { collectBatches, fetchBatches } from '@/lib/collect-client';
 import { downloadExcel } from '@/lib/download';
 import { buildGroups } from '@/lib/group';
+import { pickBatches } from '@/lib/menu-select';
 import type { RunProgress } from '@/lib/run-batches';
 import { SITE_UNAVAILABLE_MESSAGE } from '@/lib/site-check';
-import type { Group, PageResult } from '@/lib/types';
+import type { Batch, Group, PageResult } from '@/lib/types';
 
 type Screen =
   | { kind: '시작' }
+  | { kind: '메뉴 선택'; startUrl: string; batches: Batch[] }
   | { kind: '수집 중'; progress: RunProgress | null }
   | {
       kind: '결과';
@@ -25,6 +29,8 @@ type Screen =
       /** 엑셀 "안내" 시트에 적을 시작 주소와 수집을 마친 시각 */
       startUrl: string;
       collectedAt: Date;
+      /** 메뉴를 골라 수집했으면 고른 상단 메뉴, 전체 수집이면 없음 */
+      menus?: string[];
     }
   | { kind: '오류'; message: string };
 
@@ -46,29 +52,46 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [mustWarn]);
 
-  const start = async (startUrl: string) => {
+  // collect-client가 돌려주는 안내 문장은 화면에 그대로 보여 줘도 된다
+  const showError = (error: unknown) =>
+    setScreen({ kind: '오류', message: error instanceof Error ? error.message : '수집 중 문제가 생겼어요' });
+
+  // 묶음 목록(전체 또는 고른 메뉴만)을 차례로 수집하고 결과 화면으로
+  const run = async (startUrl: string, batches: Batch[], menus?: string[]) => {
     setScreen({ kind: '수집 중', progress: null });
     try {
-      const outcome = await collectAll(startUrl, {
+      const outcome = await collectBatches(batches, {
         onProgress: (progress) => setScreen({ kind: '수집 중', progress }),
       });
       if (outcome.stoppedAsUnavailable) {
         setScreen({ kind: '오류', message: SITE_UNAVAILABLE_MESSAGE });
-      } else {
-        // 같은 항목 묶기·공통ID는 브라우저 안에서 한 번만 계산한다(DESIGN.md 5장 ④)
-        const groups = buildGroups(outcome.results);
-        setScreen({
-          kind: '결과',
-          results: outcome.results,
-          totalPages: outcome.totalPages,
-          groups,
-          startUrl,
-          collectedAt: new Date(),
-        });
+        return;
       }
+      // 같은 항목 묶기·공통ID는 브라우저 안에서 한 번만 계산한다(DESIGN.md 5장 ④)
+      const groups = buildGroups(outcome.results);
+      setScreen({
+        kind: '결과',
+        results: outcome.results,
+        totalPages: outcome.totalPages,
+        groups,
+        startUrl,
+        collectedAt: new Date(),
+        menus,
+      });
     } catch (error) {
-      // collect-client가 돌려주는 안내 문장은 화면에 그대로 보여 줘도 된다
-      setScreen({ kind: '오류', message: error instanceof Error ? error.message : '수집 중 문제가 생겼어요' });
+      showError(error);
+    }
+  };
+
+  // [수집 시작]/[메뉴 읽기]: 메뉴를 읽고, 전체 수집이면 바로 수집, 메뉴 고르기면 고르기 화면으로 (PLAN 작업 25)
+  const start = async (startUrl: string, mode: CollectMode) => {
+    setScreen({ kind: '수집 중', progress: null });
+    try {
+      const { batches } = await fetchBatches(startUrl);
+      if (mode === '메뉴 고르기') setScreen({ kind: '메뉴 선택', startUrl, batches });
+      else await run(startUrl, batches);
+    } catch (error) {
+      showError(error);
     }
   };
 
@@ -103,6 +126,14 @@ export default function Home() {
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
         {screen.kind === '시작' && <StartForm onStart={start} />}
 
+        {screen.kind === '메뉴 선택' && (
+          <MenuPicker
+            batches={screen.batches}
+            onPick={(menus) => run(screen.startUrl, pickBatches(screen.batches, menus), menus)}
+            onCancel={() => setScreen({ kind: '시작' })}
+          />
+        )}
+
         {screen.kind === '수집 중' && <ProgressPanel progress={screen.progress} />}
 
         {screen.kind === '결과' && (
@@ -111,6 +142,7 @@ export default function Home() {
               results={screen.results}
               totalPages={screen.totalPages}
               groups={screen.groups}
+              menus={screen.menus}
               onDownload={download}
               downloading={downloading}
             />
