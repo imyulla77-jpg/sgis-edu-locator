@@ -160,10 +160,31 @@ async function readTopMenus(page: Page): Promise<TopMenu[]> {
       };
     }),
   );
+  return parseTopMenus(raw, page.url());
+}
+
+/** 메인 화면에서 읽은 상단 메뉴 하나 (링크는 href와 onclick 글자를 이어 붙인 것) */
+export interface RawTopMenu {
+  name: string;
+  topLink: string;
+  subs: { name: string; link: string }[];
+}
+
+/**
+ * 아직 주소가 채워지지 않은 자리표시 링크인지 (예: 초등 수업하기의 "1·2·3" — href가 비었거나 "#", "javascript:void(0)").
+ * 주소 모양('/')이 하나도 없으면 자리표시로 본다. 다른 사이트·게시판 직접 링크처럼 주소가 있는데
+ * '/view/'가 아닌 링크는 자리표시가 아니라 "수집하지 않는 링크"라서 건너뛴다(CHECK.md Gap #1).
+ */
+export function isPlaceholderLink(name: string, link: string): boolean {
+  return !name || !link.includes('/');
+}
+
+/** 읽은 상단 메뉴에서 수집할 하위 메뉴 주소를 꺼낸다(브라우저 없이 계산만 하는 부분) */
+export function parseTopMenus(raw: RawTopMenu[], baseUrl: string): TopMenu[] {
   // 링크 글자에서 '/view/...' 주소를 꺼내 전체 주소로 바꾼다
   const toUrl = (link: string) => {
     const m = link.match(/'(\/view\/[^']+)'/) ?? link.match(/(\/view\/\S+)/);
-    return m ? new URL(m[1], page.url()).href : null;
+    return m ? new URL(m[1], baseUrl).href : null;
   };
   return raw
     .filter((menu) => menu.name)
@@ -171,7 +192,8 @@ async function readTopMenus(page: Page): Promise<TopMenu[]> {
       const subs = menu.subs
         .map((s) => ({ name: s.name, url: toUrl(s.link) }))
         .filter((s): s is { name: string; url: string } => Boolean(s.name && s.url));
-      const pending = menu.subs.length - subs.length;
+      // 자리표시 링크만 "덜 채워짐"으로 센다. '/view/'가 아닌 진짜 주소(다른 사이트 등)는 건너뛴다
+      const pending = menu.subs.filter((s) => isPlaceholderLink(s.name, s.link)).length;
       // 하위 메뉴 링크가 아예 없으면 상단 메뉴 링크 자체를 수집 대상으로 쓴다
       // (하위 메뉴가 아직 채워지는 중이면 상단 링크로 대신하지 않는다 — pending으로 다시 읽게 함)
       const topUrl = toUrl(menu.topLink);
