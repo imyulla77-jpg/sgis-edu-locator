@@ -16,8 +16,19 @@ import type { PageTarget, RawItem } from './types.ts';
  * - 게시판 페이지(주소에 boardList): 표의 본문 줄(`tbody`) 전부
  * 표 제목(caption)·열 이름(thead)·미리보기 상자의 제목과 [더보기]는 게시판 데이터가 아닌 화면 글자라 수집한다.
  */
-const BOARD_DATA_ALWAYS = '[id^="board"][id$="List"]';
+/**
+ * 이용자가 올린 콘텐츠 카드: 작성자 아이디(`.userId`, 예: "s*****0")가 붙은 카드(li) 전체
+ * (함께하는 지도·배우는 지도 목록, 메인의 미리보기). 지도 제목·지역·해시태그·아이디·이용자 그림이 들어 있다.
+ * 운영자가 바꾸는 현행화 대상이 아니고 개인정보에 가까워 수집하지 않는다(담당자 결정 2026-10-12, CHECK.md SEC-007).
+ */
+const USER_CONTENT = 'li:has(.userId)';
+const BOARD_DATA_ALWAYS = `[id^="board"][id$="List"], ${USER_CONTENT}`;
 const BOARD_DATA_ON_BOARD_PAGE = `${BOARD_DATA_ALWAYS}, tbody`;
+
+/** 이용자가 올린 그림 주소인지 (주소에 /upload/가 들어감). 카드 밖에 있어도 수집하지 않는다 */
+export function isUserUploadedImage(url: string): boolean {
+  return /\/upload\//i.test(url);
+}
 
 /** 게시판 목록이 있는 페이지인지 (주소에 boardList가 들어감) */
 export function isBoardPage(url: string): boolean {
@@ -160,5 +171,6 @@ function readItemsInPage(boardDataSelector: string): RawItem[] {
 export async function extractPageItems(page: Page, target: PageTarget): Promise<RawItem[]> {
   await scrollToBottom(page);
   const boardData = isBoardPage(target.url) ? BOARD_DATA_ON_BOARD_PAGE : BOARD_DATA_ALWAYS;
-  return page.evaluate(readItemsInPage, boardData);
+  const items = await page.evaluate(readItemsInPage, boardData);
+  return items.filter((item) => !(item.kind === '이미지' && isUserUploadedImage(item.value)));
 }
