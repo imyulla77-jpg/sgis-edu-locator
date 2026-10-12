@@ -12,9 +12,12 @@ export const REQUEST_TIMEOUT_MS = 130_000;
 
 /** 서버가 오류를 알려 줄 때 쓰는 오류. message는 화면에 그대로 보여 줘도 되는 문장이다 */
 export class CollectRequestError extends Error {
-  constructor(message: string) {
+  /** 서버가 돌려준 상태 코드 (응답이 없었으면 없음). 429면 서버가 앞 작업을 아직 하는 중 */
+  readonly status?: number;
+  constructor(message: string, status?: number) {
     super(message);
     this.name = 'CollectRequestError';
+    this.status = status;
   }
 }
 
@@ -33,7 +36,7 @@ async function postJson<T>(path: string, body: unknown, base = ''): Promise<T> {
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new CollectRequestError(data?.error ?? '서버에서 문제가 생겼어요');
+    if (!response.ok) throw new CollectRequestError(data?.error ?? '서버에서 문제가 생겼어요', response.status);
     return data as T;
   } catch (error) {
     if (error instanceof CollectRequestError) throw error;

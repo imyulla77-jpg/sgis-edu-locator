@@ -14,6 +14,17 @@ import { COURSES } from './types.ts';
 /** 묶음과 묶음 사이에 쉬는 시간 (DESIGN.md 7장: 1초 이상) */
 export const BATCH_GAP_MS = 1_000;
 
+/** 서버가 "앞 작업 중"(429)일 때 다시 보내기 전에 쉬는 시간 */
+export const BUSY_RETRY_MS = 5_000;
+
+/** "앞 작업 중"이라 기다리는 최대 시간. 서버 묶음 최대 실행 시간(120초) + 여유 */
+const BUSY_WAIT_LIMIT_MS = 150_000;
+
+/** 서버가 "앞 작업을 아직 하는 중"(429)이라고 알려 준 오류인지 */
+function isBusy(error: unknown): boolean {
+  return (error as { status?: number } | null)?.status === 429;
+}
+
 /** 다시 보낼 때 묶음 하나에 넣는 최대 페이지 수 (DESIGN.md 2장 C안) */
 const MAX_PAGES_PER_BATCH = 6;
 
@@ -43,6 +54,8 @@ export interface RunProgress {
 
 export interface RunOptions {
   gapMs?: number;
+  /** 서버가 "앞 작업 중"(429)일 때 다시 보내기 전에 쉬는 시간 (시험할 때 줄임) */
+  busyWaitMs?: number;
   /** 묶음을 보내기 직전·결과를 받은 직후마다 불린다 */
   onProgress?: (progress: RunProgress) => void;
 }
@@ -61,12 +74,21 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * 그래도 안 되면 묶음의 페이지를 모두 "수집 실패"로 기록한다 (DESIGN.md 9장).
  * 앞 요청의 응답을 받은 뒤에만 다음 요청을 보내므로 같은 페이지를 동시에 두 번 열지 않는다.
  */
-async function sendWithRetry(send: SendBatch, batch: Batch, gapMs: number): Promise<PageResult[]> {
+async function sendWithRetry(send: SendBatch, batch: Batch, gapMs: number, busyWaitMs: number): Promise<PageResult[]> {
   let reason = '서버 응답 없음';
+  const busyDeadline = Date.now() + BUSY_WAIT_LIMIT_MS;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return await send(batch);
     } catch (error) {
+      // 서버가 "앞 작업을 아직 하는 중"(429)이라고 하면, 실패로 세지 않고 끝날 때까지 기다렸다가 다시 보낸다.
+      // 130초 동안 응답이 없어 다시 보냈는데 서버는 앞 묶음을 아직 수집하는 경우다(CHECK.md B2).
+      // 서버는 한 번에 1개만 수집하므로(lib/server-limit.ts) 브라우저가 동시에 두 개 열리지 않는다.
+      if (isBusy(error) && Date.now() + busyWaitMs < busyDeadline) {
+        await sleep(busyWaitMs);
+        attempt--;
+        continue;
+      }
       // 서버가 알려 준 안내 문장(예: "PC에 Edge나 Chrome이 필요해요")은 실패 이유로 그대로 남긴다.
       // 한글이 없는 문장은 기술 용어일 수 있어 보여 주지 않는다(DESIGN.md 9장).
       const message = error instanceof Error ? error.message : '';
@@ -94,7 +116,7 @@ function rebatch(results: PageResult[]): Batch[] {
  * 3. 다 보낸 뒤 "시간 초과" 페이지를 모아 맨 뒤에 1번만 다시 보낸다. 그래도 시간 초과면 "수집 실패"
  */
 export async function runBatches(batches: Batch[], send: SendBatch, options: RunOptions = {}): Promise<RunOutcome> {
-  const { gapMs = BATCH_GAP_MS, onProgress } = options;
+  const { gapMs = BATCH_GAP_MS, busyWaitMs = BUSY_RETRY_MS, onProgress } = options;
   const totalPages = batches.reduce((sum, b) => sum + b.pages.length, 0);
   const results: PageResult[] = [];
   const isDone = (r: PageResult) => r.status !== '시간 초과'; // 시간 초과는 다시 보내므로 아직 안 끝난 것으로 센다
@@ -117,7 +139,7 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
   for (const [index, batch] of batches.entries()) {
     if (index > 0) await sleep(gapMs);
     report(batch);
-    results.push(...(await sendWithRetry(send, batch, gapMs)));
+    results.push(...(await sendWithRetry(send, batch, gapMs, busyWaitMs)));
     report(batch);
     if (isSiteUnavailable(results)) return { results, stoppedAsUnavailable: true };
   }
@@ -127,7 +149,7 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
   for (const batch of rebatch(timedOut)) {
     await sleep(gapMs);
     report(batch);
-    const retried = await sendWithRetry(send, batch, gapMs);
+    const retried = await sendWithRetry(send, batch, gapMs, busyWaitMs);
     for (const result of retried) {
       const index = results.findIndex((r) => r.target.url === result.target.url && r.target.course === result.target.course);
       results[index] =
