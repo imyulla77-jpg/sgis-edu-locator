@@ -25,7 +25,7 @@
 | # | 출처 | 내용 | 간단한 해결 방법 |
 |---|---|---|---|
 | 1 | SEC-001 (High) — **코드 부분 완료(2026-10-12)**: 서버 브라우저 동시 1개·그림 받기 동시 3개, 넘으면 429(`lib/server-limit.ts`). 남은 일: 공개할 때 Vercel 비밀번호 보호 켜기 | 수집 API 3개(`/api/collect`·`/api/menus`·`/api/image`)에 로그인·속도 제한·동시 실행 제한이 없다. 공개하면 누구나 서버 브라우저를 띄워 SGIS에 대량으로 요청할 수 있다. | Vercel Deployment Protection(비밀번호)을 켠다(코드 변경 없음). 코드로는 서버 한 대에서 동시 수집을 1개로 막는다(이미 수집 중이면 429). |
-| 2 | SEC-002 (Medium, 추정) · Gap #6 | 페이지를 연 뒤 실제로 도착한 주소를 다시 검사하지 않는다. 사이트가 다른 곳으로 넘겨주면 로그인 화면·사내망·다른 사이트 글자를 수집할 수 있다. 그림 받기(`page.request.get`)도 넘겨주기를 따라간다. | `openPage` 직후 `isAllowedUrl(page.url())`을 검사한다. 그림 받기에 `maxRedirects: 0`을 준다. (`lib/collect.ts`, `lib/menus.ts`) |
+| 2 | SEC-002 (Medium, 추정) · Gap #6 — **완료(2026-10-12)**: 도착 주소 재검사, 그림 받기는 넘겨주기 안 따라감 | 페이지를 연 뒤 실제로 도착한 주소를 다시 검사하지 않는다. 사이트가 다른 곳으로 넘겨주면 로그인 화면·사내망·다른 사이트 글자를 수집할 수 있다. 그림 받기(`page.request.get`)도 넘겨주기를 따라간다. | `openPage` 직후 `isAllowedUrl(page.url())`을 검사한다. 그림 받기에 `maxRedirects: 0`을 준다. (`lib/collect.ts`, `lib/menus.ts`) |
 | 3 | SEC-003 (Medium) | `npm run dev`가 모든 네트워크에 열려 있다. 같은 와이파이·사내망 사람이나 담당자가 연 다른 웹페이지가 담당자 PC에서 Edge를 띄우게 할 수 있다. **PC 사용에도 해당한다.** | `"dev": "next dev -H 127.0.0.1"`로 바꾼다. 각 API 앞에서 `sec-fetch-site`가 `same-origin`이 아니면 403으로 거절한다. |
 
 ### 2순위 — 결과가 틀리거나 수집이 멈출 수 있음

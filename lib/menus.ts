@@ -61,6 +61,9 @@ export class MenuError extends Error {
   }
 }
 
+/** 메뉴를 읽으려고 연 페이지가 sgis.mods.go.kr 밖으로 넘어갔을 때의 안내 */
+export const OFF_SITE_MENU_MESSAGE = '사이트가 sgis.mods.go.kr 밖의 주소로 넘어가서 메뉴를 읽지 않았어요';
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** 메뉴가 다 채워졌는지 확인할 때 다시 읽는 간격과, 다 채워질 때까지 기다리는 최대 시간 */
@@ -116,9 +119,12 @@ async function openAndRead<T>(
     try {
       const started = Date.now();
       await openPage(page, url, waitMs);
+      // 사이트가 다른 주소로 넘겨줬으면 그 화면에서 메뉴를 읽지 않고 멈춘다(CHECK.md SEC-002)
+      if (!isAllowedUrl(page.url())) throw new MenuError(OFF_SITE_MENU_MESSAGE);
       lastRead = { value: await readWhenStable(page, read, isEmpty, waitMs - (Date.now() - started)) };
       if (!isEmpty(lastRead.value)) return lastRead.value;
-    } catch {
+    } catch (error) {
+      if (error instanceof MenuError) throw error;
       // 열리지 않음 → 다음 시도로 넘어간다
     }
   }

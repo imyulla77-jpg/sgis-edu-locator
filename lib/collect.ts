@@ -11,6 +11,9 @@ import { extractPageItems } from './extract.ts';
 import type { Batch, PageResult, PageTarget, RawItem } from './types.ts';
 import { isAllowedUrl } from './url.ts';
 
+/** 페이지를 열었더니 sgis.mods.go.kr 밖으로 넘어갔을 때의 실패 이유 */
+export const OFF_SITE_MESSAGE = '허용되지 않은 주소로 넘어감';
+
 /** 묶음 하나의 시간 한도. 이 시간이 지나면 새 페이지를 열지 않는다(최대 실행 시간 120초 안에 응답하기 위함) */
 export const BATCH_TIME_LIMIT_MS = 100_000;
 
@@ -48,7 +51,8 @@ type FingerprintCache = Map<string, string | null>;
 async function fingerprint(page: Page, url: string, waitMs: number): Promise<string | null> {
   if (!isAllowedUrl(url) || waitMs <= 0) return null;
   try {
-    const response = await page.request.get(url, { timeout: waitMs });
+    // 다른 주소로 넘겨주는 응답은 따라가지 않는다(넘겨준 곳이 sgis 밖일 수 있음, CHECK.md SEC-002)
+    const response = await page.request.get(url, { timeout: waitMs, maxRedirects: 0 });
     if (!response.ok()) return null;
     return createHash('sha256').update(await response.body()).digest('hex');
   } catch {
@@ -94,6 +98,10 @@ async function tryOpen(
 ): Promise<Attempt> {
   try {
     const response = await openPage(page, target.url, waitMs);
+    // 사이트가 다른 주소로 넘겨줬으면(로그인 화면·다른 사이트 등) 그 화면은 읽지 않는다(CHECK.md SEC-002)
+    if (!isAllowedUrl(page.url())) {
+      return { ok: false, error: OFF_SITE_MESSAGE, cutByLimit: false };
+    }
     if (response && response.status() >= 400) {
       return { ok: false, error: `페이지 응답 오류(${response.status()})`, cutByLimit: false };
     }
