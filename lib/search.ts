@@ -1,5 +1,7 @@
 // [화면] 결과 검색 — 순수 계산 (DESIGN.md 4.3장, PLAN 작업 19)
 // - 검색 대상: 내용(문구) · 이미지 파일 이름 · 대체텍스트 · 메뉴 이름. 대소문자는 구분하지 않는다
+// - 띄어쓰기·줄바꿈은 무시하고 찾는다. 사이트나 엑셀에서 복사한 문구에 줄바꿈이 끼거나
+//   띄어쓰기가 조금 달라도 찾을 수 있게 하기 위함(2026-10-12 사용성 개선)
 // - 건수 세는 단위: 공통ID 1개 = 1건. "전체 N건"과 "최대 100건 표시" 모두 공통ID 기준
 // - 필터 2개: 구분(전체/이미지/문구), 과정(전체/3과정 공통). 검색어와 함께 적용
 // - 검색어가 비어 있으면 필터만 적용한 전체 목록을, 1글자면 "2글자 이상" 안내를 돌려준다
@@ -28,18 +30,23 @@ export type SearchOutput =
   | { status: '짧음' } // 검색어가 1글자
   | { status: '결과'; total: number; shown: Group[] };
 
-/** 내용·파일 이름·대체텍스트 (소문자로) */
-function contentText(group: Group): string {
-  return `${group.display}\n${group.alt ?? ''}`.toLowerCase();
+/** 띄어쓰기·줄바꿈을 모두 빼고 소문자로 바꾼다 (검색어와 검색 대상에 똑같이 적용) */
+export function squash(text: string): string {
+  return text.replace(/\s+/g, '').toLowerCase();
 }
 
-/** 메뉴 이름들 (소문자로) */
+/** 내용·파일 이름·대체텍스트. 서로 이어 붙어 엉뚱하게 걸리지 않도록 '|'로 나눈다 */
+function contentText(group: Group): string {
+  return `${squash(group.display)}|${squash(group.alt ?? '')}`;
+}
+
+/** 메뉴 이름들 */
 function menuText(group: Group): string {
-  return group.locations.map((l) => l.menu).join('\n').toLowerCase();
+  return group.locations.map((l) => squash(l.menu)).join('|');
 }
 
 export function searchGroups(groups: Group[], { query, kind, scope }: SearchInput): SearchOutput {
-  const q = query.trim().toLowerCase();
+  const q = squash(query);
   if (q.length > 0 && q.length < MIN_QUERY_LENGTH) return { status: '짧음' };
 
   const filtered = groups.filter(
