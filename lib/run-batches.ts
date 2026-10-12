@@ -7,7 +7,7 @@
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
-import { isSiteUnavailable } from './site-check.ts';
+import { FIRST_PAGES_TO_CHECK, isSiteUnavailable } from './site-check.ts';
 import type { Batch, Course, PageResult } from './types.ts';
 import { COURSES } from './types.ts';
 
@@ -136,7 +136,18 @@ export async function runBatches(batches: Batch[], send: SendBatch, options: Run
       })),
     });
 
-  for (const [index, batch] of batches.entries()) {
+  const queue = [...batches];
+  for (let index = 0; index < queue.length; index++) {
+    let batch = queue[index];
+    // 지금까지 받은 결과가 모두 실패이고 아직 3페이지가 안 됐으면, 이번 묶음은 모자란 페이지 수만큼만 먼저 보낸다.
+    // 사이트가 죽어 있을 때 6페이지 묶음이 다 끝날 때까지(최대 약 100초) 기다리지 않고 바로 멈추기 위함(CHECK.md P2).
+    // 하나라도 성공했으면(정상 수집) 나누지 않으므로 요청 수가 늘지 않는다.
+    const need = FIRST_PAGES_TO_CHECK - results.length;
+    if (need > 0 && results.every((r) => r.status !== '성공') && batch.pages.length > need) {
+      const rest: Batch = { ...batch, id: `${batch.id}-나머지`, pages: batch.pages.slice(need) };
+      batch = { ...batch, pages: batch.pages.slice(0, need) };
+      queue.splice(index, 1, batch, rest);
+    }
     if (index > 0) await sleep(gapMs);
     report(batch);
     results.push(...(await sendWithRetry(send, batch, gapMs, busyWaitMs)));
