@@ -449,6 +449,7 @@ PLAN.md 작업 번호와 연결했다. 한 세션에 모듈 하나씩 진행하�
 | 2026-10-12 | **처음 3페이지 실패 판단을 3페이지째에서 바로** — 5장 ③, `lib/run-batches.ts` | [CHECK.md](CHECK.md) 3순위 9번(P2) |
 | 2026-10-12 | **수집 경로를 에듀 화면으로 제한** — 7장 상태 코드 400, `lib/url.ts` `isCollectablePage`, `/api/collect`·`lib/menus.ts` | [CHECK.md](CHECK.md) 3순위 10번(SEC-009) |
 | 2026-10-12 | **이용자 콘텐츠(작성자 아이디가 붙은 카드, `/upload/` 그림) 수집 안 함** — 8장 비고, `lib/extract.ts` | [CHECK.md](CHECK.md) 3순위 11번(SEC-007), 담당자 결정: 수집에서 빼기 (PRD 7장 "표시" 규칙을 바꿈 — PRD도 같은 날 수정) |
+| 2026-10-12 | **Vercel 배포** — GitHub 공개 저장소 `imyulla77-jpg/sgis-edu-locator`, Vercel 프로젝트 `sgis-edu-locator`. `next.config.ts`에 `outputFileTracingIncludes`(playwright-core)를 추가해 메뉴·수집 API가 배포 서버에서 시작되게 함. 환경 변수 없음(앱이 쓰지 않음). 서버용 크롬은 아직 없어 배포본에서는 수집 불가 | 담당자 요청 |
 
 **알고도 남겨 둔 것** (담당자 결정, 점검 보고서 4·7장)
 - ~~"처음 3페이지 연속 실패" 판단이 묶음 단위라 최대 약 100초 더 기다릴 수 있음 (P2)~~ → 2026-10-12 해결: 실패만 이어질 때는 묶음을 나눠 3페이지째에서 멈춤
