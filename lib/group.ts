@@ -36,21 +36,40 @@ export function imageFileName(url: string): string {
   }
 }
 
+/**
+ * 같은 수집 안에서 그림 주소 → 처음 받은 파일 지문.
+ * 한 곳에서 지문을 받지 못했어도(묶음 시간이 거의 다 됐거나 잠깐 실패) 같은 주소의 지문을 다른 곳에서 받았으면
+ * 그 지문을 빌려 쓴다. 그래야 같은 그림이 "I:지문"과 "U:주소"로 쪼개져 3과정 공통이 2과정·1과정으로
+ * 나뉘거나, 지난 결과 비교에서 "새로 생김 + 사라짐"으로 잘못 나오지 않는다(CHECK.md Gap #4).
+ */
+function hashesByUrl(results: PageResult[]): Map<string, string> {
+  const hashes = new Map<string, string>();
+  for (const result of results) {
+    if (result.status !== '성공') continue;
+    for (const item of result.items) {
+      if (item.kind === '이미지' && item.hash && !hashes.has(item.value)) hashes.set(item.value, item.hash);
+    }
+  }
+  return hashes;
+}
+
 /** 항목 하나의 묶는 기준과 처음 만들 묶음. 묶지 않는 항목이면 null */
-function draftOf(item: RawItem): DraftGroup | null {
+function draftOf(item: RawItem, hashes: Map<string, string>): DraftGroup | null {
   if (item.kind === '문구') {
     const text = normalizeText(item.value);
     if (!hasWords(text)) return null;
     return { kind: '문구', key: `T:${text}`, display: text, comparable: true, courses: [], locations: [] };
   }
-  // 이미지: 지문이 있으면 지문으로, 없으면("비교 불가") 주소가 완전히 같을 때만 같은 항목
+  // 이미지: 지문이 있으면 지문으로(이 위치에서 못 받았으면 같은 주소에서 받은 지문),
+  // 끝내 없으면("비교 불가") 주소가 완전히 같을 때만 같은 항목
+  const hash = item.hash ?? hashes.get(item.value);
   return {
     kind: '이미지',
-    key: item.hash ? `I:${item.hash}` : `U:${item.value}`,
+    key: hash ? `I:${hash}` : `U:${item.value}`,
     display: imageFileName(item.value),
     imageUrl: item.value,
     alt: item.alt || undefined,
-    comparable: Boolean(item.hash),
+    comparable: Boolean(hash),
     courses: [],
     locations: [],
   };
@@ -79,12 +98,13 @@ function addLocation(group: DraftGroup, location: Location): void {
 /** 수집 결과를 처음 나온 순서대로 훑으며 묶는다. "성공"한 페이지의 항목만 쓴다 */
 function draftGroups(results: PageResult[], kinds: ItemKind[]): DraftGroup[] {
   const groups = new Map<string, DraftGroup>(); // Map은 넣은 순서 = 처음 나온 순서를 지킨다
+  const hashes = hashesByUrl(results);
   for (const result of results) {
     if (result.status !== '성공') continue;
     const { course, menu, url } = result.target;
     for (const item of result.items) {
       if (!kinds.includes(item.kind)) continue;
-      const draft = draftOf(item);
+      const draft = draftOf(item, hashes);
       if (!draft) continue;
       let group = groups.get(draft.key);
       if (!group) {
