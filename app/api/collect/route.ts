@@ -5,7 +5,7 @@
 import { BrowserNotFoundError } from '@/lib/browser';
 import { collectBatch } from '@/lib/collect';
 import { MAX_PAGES_PER_BATCH } from '@/lib/menus';
-import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, tryAcquire } from '@/lib/server-limit';
+import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, crossSiteResponse, tryAcquire } from '@/lib/server-limit';
 import { COURSES, type Batch } from '@/lib/types';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
@@ -30,6 +30,10 @@ function checkBatch(batch: unknown): string | null {
 }
 
 export async function POST(request: Request) {
+  // 다른 웹사이트가 몰래 보낸 요청은 거절한다(CHECK.md SEC-003)
+  const crossSite = crossSiteResponse(request);
+  if (crossSite) return crossSite;
+
   const body = await request.json().catch(() => null);
   const problem = checkBatch(body?.batch);
   if (problem) return Response.json({ error: problem }, { status: 400 });

@@ -3,13 +3,17 @@
 
 import { BrowserNotFoundError } from '@/lib/browser';
 import { loadBatches, MenuError } from '@/lib/menus';
-import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, tryAcquire } from '@/lib/server-limit';
+import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, crossSiteResponse, tryAcquire } from '@/lib/server-limit';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
 /** 최대 실행 시간(초). 메뉴 읽기 전체 한도(50초)보다 조금 길게 둔다 */
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  // 다른 웹사이트가 몰래 보낸 요청은 거절한다(CHECK.md SEC-003)
+  const crossSite = crossSiteResponse(request);
+  if (crossSite) return crossSite;
+
   const body = await request.json().catch(() => null);
   const startUrl = typeof body?.startUrl === 'string' ? body.startUrl : '';
   // 화면 검사를 건너뛰는 요청도 막는다(DESIGN.md 7·10장)

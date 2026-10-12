@@ -30,6 +30,18 @@ export function tryAcquire(name: string, max: number): (() => void) | null {
   };
 }
 
+/**
+ * 다른 웹사이트가 담당자 브라우저를 통해 몰래 보낸 요청이면 403 응답을, 아니면 null을 돌려준다 (CHECK.md SEC-003).
+ * 브라우저는 요청마다 어디서 보냈는지(Sec-Fetch-Site)를 붙인다. 우리 화면(same-origin)과
+ * 주소창에 직접 입력(none)만 받는다. 이 머리말이 없는 요청(curl 등 브라우저 밖)은 개발 서버를
+ * 이 PC에서만 열어(package.json dev -H 127.0.0.1) 막는다.
+ */
+export function crossSiteResponse(request: Request): Response | null {
+  const site = request.headers.get('sec-fetch-site');
+  if (site === null || site === 'same-origin' || site === 'none') return null;
+  return Response.json({ error: '이 앱 화면에서 보낸 요청만 받을 수 있어요' }, { status: 403 });
+}
+
 /** 자리가 없을 때 돌려주는 응답 (429: 요청이 너무 많음) */
 export function busyResponse(message: string): Response {
   return Response.json({ error: message }, { status: 429, headers: { 'Retry-After': '10' } });

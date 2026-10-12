@@ -3,7 +3,7 @@
 // 그래서 같은 사이트(우리 서버)를 거쳐 그림을 받는다.
 // 앱이 다른 사이트를 대신 여는 통로가 되지 않도록 sgis.mods.go.kr 주소만, 그림만, 10MB까지만 전달한다(DESIGN.md 10장).
 
-import { busyResponse, IMAGE_BUSY_MESSAGE, IMAGE_SLOTS, tryAcquire } from '@/lib/server-limit';
+import { busyResponse, crossSiteResponse, IMAGE_BUSY_MESSAGE, IMAGE_SLOTS, tryAcquire } from '@/lib/server-limit';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
 /** 그림 하나를 받을 때 기다리는 최대 시간 (수집 때와 같은 10초) */
@@ -15,6 +15,10 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const maxDuration = 15;
 
 export async function GET(request: Request) {
+  // 다른 웹사이트가 몰래 보낸 요청은 거절한다(CHECK.md SEC-003)
+  const crossSite = crossSiteResponse(request);
+  if (crossSite) return crossSite;
+
   const url = new URL(request.url).searchParams.get('url') ?? '';
   if (!isAllowedUrl(url)) return Response.json({ error: URL_ERROR_MESSAGE }, { status: 400 });
 
