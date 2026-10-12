@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SGIS에듀 현행화 위치찾기
 
-## Getting Started
+[SGIS에듀](https://sgis.mods.go.kr/view/edu/index)의 초등·중학·고교 3개 과정에서 **같은 이미지·문구가 어느 과정·메뉴·화면 위치에 있는지** 자동으로 찾아 주고, 엑셀로 정리해 주는 웹앱입니다.
 
-First, run the development server:
+콘텐츠를 현행화할 때 58개 페이지를 하나씩 열어 눈으로 찾던 일을 약 8분으로 줄이는 것이 목표입니다.
+
+## 무엇을 하나요
+
+1. **수집**: 3개 과정의 메인과, 3과정 모두에 있는 상단 메뉴의 하위 페이지(2026년 10월 기준 58개)를 열어 이미지와 문구를 읽습니다.
+   - 탭·펼침 메뉴 안에 숨은 요소도 함께 읽습니다.
+   - 페이지는 1초 이상 간격으로 하나씩 엽니다.
+2. **같은 항목 묶기**: 같은 항목에는 모든 과정에서 같은 공통ID(IMG-001, TXT-001 …)를 붙입니다.
+   - 이미지: 파일 내용이 완전히 같을 때 같은 항목으로 봅니다. 파일 이름이 달라도 같은 그림이면 묶입니다.
+   - 문구: 띄어쓰기를 정리한 뒤 글자가 완전히 같을 때 같은 항목으로 봅니다.
+3. **검색**: 바꿀 그림 파일 이름이나 문구를 넣으면 위치(과정 · 메뉴 · 페이지 주소 · 영역)를 보여 줍니다. 띄어쓰기와 줄바꿈은 무시하고 찾습니다.
+4. **엑셀 내보내기**: 시트 6개(안내 · 공통항목_요약 · 초등 · 중학 · 고교 · 수집 페이지)로 정리합니다.
+   - 3과정 공통 항목은 노란색으로 표시합니다.
+   - 공통항목_요약 시트에 그림 미리보기가 들어갑니다.
+5. **그 밖의 기능**
+   - 메뉴를 골라 일부만 수집하기
+   - 지난 결과 엑셀과 비교해 새로 생기거나 사라진 항목 보기
+
+수집하지 않는 것도 있습니다.
+- 로그인 화면, 게시판 데이터(글 제목·글쓴이)
+- 이용자가 올린 콘텐츠(작성자 아이디가 붙은 지도 카드, 업로드 그림)
+- sgis.mods.go.kr 밖의 사이트
+
+## 기술
+
+- Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4
+- 페이지 열기: `playwright-core`가 PC에 설치된 Edge(없으면 Chrome)를 화면 없이 띄움
+- 엑셀 만들기: `exceljs` (사용자 브라우저 안에서 생성)
+- 데이터베이스·로그인·API 키를 쓰지 않습니다(공개 사이트만 읽음)
+
+## 실행 방법 (담당자 PC 기준)
+
+준비: Node.js 24 이상, Microsoft Edge 또는 Google Chrome
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 http://localhost:3000 을 열고 [수집 시작]을 누릅니다. 전체 수집은 약 7분 걸립니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- 개발 서버는 보안을 위해 이 PC 안에서만 열립니다(`127.0.0.1`).
+- 그 밖의 명령:
+  - `npm run lint`: 코드 검사
+  - `npm run build`: 배포용 빌드
+  - `npm run collect:dev`: 화면 없이 전체 수집해 `dev-output/`에 저장
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 배포 (Vercel) 상태
 
-## Learn More
+화면은 Vercel에 배포되어 있습니다. 다만 **Vercel에서는 아직 수집이 동작하지 않습니다.**
 
-To learn more about Next.js, take a look at the following resources:
+- 수집은 PC에 설치된 Edge·Chrome을 쓰는데, Vercel 서버에는 이 브라우저가 없어서 "PC에 Edge나 Chrome이 필요해요" 안내가 나옵니다.
+- 서버용 크롬을 붙이는 작업은 다음 단계에서 진행합니다.
+- 그 전까지 실제 수집은 담당자 PC에서 `npm run dev`로 합니다.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 보안
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- 서버 API는 sgis.mods.go.kr의 에듀 화면 주소만 엽니다.
+- 페이지를 연 뒤 다른 주소로 넘어가면 수집하지 않습니다.
+- 동시에 실행할 수 있는 수와 요청 출처를 제한합니다.
+- 결과 엑셀은 **내부용**이라 이 저장소에 올리지 않습니다(`.gitignore`에 `*.xlsx` 등록).
+- 실제 운영에 쓰기 전에 SGIS에듀 운영 부서에 자동 수집 가능 여부를 확인해야 합니다.
 
-## Deploy on Vercel
+## 문서
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| 문서 | 내용 |
+|---|---|
+| [PRD.md](PRD.md) | 기획서: 문제, 목표, 범위, 규칙 |
+| [PLAN.md](PLAN.md) | 개발 계획: 성공 기준 SC-1~6, 작업 1~27 |
+| [DESIGN.md](DESIGN.md) | 설계: 화면 구성, 데이터 흐름, API, 엑셀 |
+| [CHECK.md](CHECK.md) | 점검 기록: 설계-구현 차이, 성공 기준, 보안 점검, 남은 보완 항목 |
+| [CLAUDE.md](CLAUDE.md) | AI 작업 규칙 |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+작성: 최윤라
