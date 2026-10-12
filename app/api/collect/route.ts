@@ -7,7 +7,7 @@ import { collectBatch } from '@/lib/collect';
 import { MAX_PAGES_PER_BATCH } from '@/lib/menus';
 import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, crossSiteResponse, tryAcquire } from '@/lib/server-limit';
 import { COURSES, type Batch } from '@/lib/types';
-import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
+import { isAllowedUrl, isCollectablePage, PAGE_PATH_ERROR_MESSAGE, URL_ERROR_MESSAGE } from '@/lib/url';
 
 /** 최대 실행 시간(초). 묶음 시간 한도(100초) + 브라우저 닫기 여유 */
 export const maxDuration = 120;
@@ -25,6 +25,8 @@ function checkBatch(batch: unknown): string | null {
     if (!page || !COURSES.includes(page.course) || typeof page.menu !== 'string') return '수집 묶음 형식이 올바르지 않아요';
     // sgis.mods.go.kr이 아닌 주소는 열지 않는다(DESIGN.md 7·10장)
     if (typeof page.url !== 'string' || !isAllowedUrl(page.url)) return URL_ERROR_MESSAGE;
+    // 에듀 화면(/view/edu/…)이 아닌 sgis 페이지(로그인 화면 등)도 열지 않는다(CHECK.md SEC-009)
+    if (!isCollectablePage(page.url)) return PAGE_PATH_ERROR_MESSAGE;
   }
   return null;
 }
