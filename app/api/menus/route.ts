@@ -3,6 +3,7 @@
 
 import { BrowserNotFoundError } from '@/lib/browser';
 import { loadBatches, MenuError } from '@/lib/menus';
+import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, tryAcquire } from '@/lib/server-limit';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
 /** 최대 실행 시간(초). 메뉴 읽기 전체 한도(50초)보다 조금 길게 둔다 */
@@ -14,6 +15,9 @@ export async function POST(request: Request) {
   // 화면 검사를 건너뛰는 요청도 막는다(DESIGN.md 7·10장)
   if (!isAllowedUrl(startUrl)) return Response.json({ error: URL_ERROR_MESSAGE }, { status: 400 });
 
+  // 서버 브라우저는 메뉴 읽기·수집을 합쳐 한 번에 1개만 띄운다(CHECK.md SEC-001)
+  const release = tryAcquire('browser', BROWSER_SLOTS);
+  if (!release) return busyResponse(BROWSER_BUSY_MESSAGE);
   try {
     return Response.json(await loadBatches(startUrl));
   } catch (error) {
@@ -21,5 +25,7 @@ export async function POST(request: Request) {
     if (error instanceof MenuError) return Response.json({ error: error.message }, { status: 503 });
     console.error('[api/menus]', error);
     return Response.json({ error: '메뉴를 읽는 중 문제가 생겼어요' }, { status: 500 });
+  } finally {
+    release();
   }
 }

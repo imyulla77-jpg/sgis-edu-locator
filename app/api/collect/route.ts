@@ -5,6 +5,7 @@
 import { BrowserNotFoundError } from '@/lib/browser';
 import { collectBatch } from '@/lib/collect';
 import { MAX_PAGES_PER_BATCH } from '@/lib/menus';
+import { BROWSER_BUSY_MESSAGE, BROWSER_SLOTS, busyResponse, tryAcquire } from '@/lib/server-limit';
 import { COURSES, type Batch } from '@/lib/types';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
@@ -33,11 +34,16 @@ export async function POST(request: Request) {
   const problem = checkBatch(body?.batch);
   if (problem) return Response.json({ error: problem }, { status: 400 });
 
+  // 서버 브라우저는 메뉴 읽기·수집을 합쳐 한 번에 1개만 띄운다(CHECK.md SEC-001)
+  const release = tryAcquire('browser', BROWSER_SLOTS);
+  if (!release) return busyResponse(BROWSER_BUSY_MESSAGE);
   try {
     return Response.json({ results: await collectBatch(body.batch as Batch) });
   } catch (error) {
     if (error instanceof BrowserNotFoundError) return Response.json({ error: error.message }, { status: 500 });
     console.error('[api/collect]', error);
     return Response.json({ error: '수집 중 문제가 생겼어요' }, { status: 500 });
+  } finally {
+    release();
   }
 }

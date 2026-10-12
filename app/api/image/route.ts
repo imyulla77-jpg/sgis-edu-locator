@@ -3,6 +3,7 @@
 // 그래서 같은 사이트(우리 서버)를 거쳐 그림을 받는다.
 // 앱이 다른 사이트를 대신 여는 통로가 되지 않도록 sgis.mods.go.kr 주소만, 그림만, 10MB까지만 전달한다(DESIGN.md 10장).
 
+import { busyResponse, IMAGE_BUSY_MESSAGE, IMAGE_SLOTS, tryAcquire } from '@/lib/server-limit';
 import { isAllowedUrl, URL_ERROR_MESSAGE } from '@/lib/url';
 
 /** 그림 하나를 받을 때 기다리는 최대 시간 (수집 때와 같은 10초) */
@@ -17,6 +18,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url).searchParams.get('url') ?? '';
   if (!isAllowedUrl(url)) return Response.json({ error: URL_ERROR_MESSAGE }, { status: 400 });
 
+  // 그림 대신 받기는 한 번에 3개까지만(CHECK.md SEC-001)
+  const release = tryAcquire('image', IMAGE_SLOTS);
+  if (!release) return busyResponse(IMAGE_BUSY_MESSAGE);
   try {
     const response = await fetch(url, {
       // 다른 사이트로 넘겨주는(리다이렉트) 응답은 따라가지 않는다
@@ -34,5 +38,7 @@ export async function GET(request: Request) {
     return new Response(bytes, { headers: { 'Content-Type': type, 'Cache-Control': 'private, max-age=600' } });
   } catch {
     return Response.json({ error: '그림을 받지 못했어요' }, { status: 502 });
+  } finally {
+    release();
   }
 }
