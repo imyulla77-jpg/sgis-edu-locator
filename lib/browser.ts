@@ -1,6 +1,6 @@
 // [서버 전용] 브라우저 띄우기 (DESIGN.md 7장 "브라우저 띄우기", PLAN 작업 4)
 // 담당자 PC에 설치된 Edge를 쓰고, 없으면 Chrome을 쓴다.
-// Vercel용 @sparticuz/chromium 연결은 Part 5에서 이 파일에 추가한다.
+// Vercel에는 Edge·Chrome이 없어서 서버용 크롬(@sparticuz/chromium)을 쓴다(Part 5, launchBrowser).
 //
 // scripts/collect-dev.ts에서도 불러올 수 있도록 다른 lib 파일을 불러오지 않는다(CLAUDE.md 5장).
 
@@ -30,8 +30,21 @@ export class BrowserNotFoundError extends Error {
   }
 }
 
-/** 화면 없이(headless) 브라우저를 띄운다. Edge가 없으면 Chrome, 둘 다 없으면 BrowserNotFoundError */
+/** Vercel 같은 서버리스 서버에서 실행 중인지 (Edge·Chrome이 설치돼 있지 않은 곳) */
+function isServerless(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
+/**
+ * 화면 없이(headless) 브라우저를 띄운다.
+ * - 담당자 PC: Edge가 없으면 Chrome, 둘 다 없으면 BrowserNotFoundError
+ * - Vercel 서버: 서버용 크롬(@sparticuz/chromium)을 풀어서 띄운다. 이 패키지는 Vercel에서만 불러온다
+ */
 export async function launchBrowser(): Promise<Browser> {
+  if (isServerless()) {
+    const { default: serverChrome } = await import('@sparticuz/chromium');
+    return chromium.launch({ executablePath: await serverChrome.executablePath(), args: serverChrome.args, headless: true });
+  }
   for (const channel of CHANNELS) {
     try {
       return await chromium.launch({ channel, headless: true });

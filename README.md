@@ -51,11 +51,11 @@ npm run dev
 
 ## 배포 (Vercel) 상태
 
-화면은 Vercel에 배포되어 있습니다. 다만 **Vercel에서는 아직 수집이 동작하지 않습니다.**
+https://sgis-edu-locator.vercel.app 에서 PC 설치 없이 바로 수집할 수 있습니다.
 
-- 수집은 PC에 설치된 Edge·Chrome을 쓰는데, Vercel 서버에는 이 브라우저가 없어서 "PC에 Edge나 Chrome이 필요해요" 안내가 나옵니다.
-- 서버용 크롬을 붙이는 작업은 다음 단계에서 진행합니다.
-- 그 전까지 실제 수집은 담당자 PC에서 `npm run dev`로 합니다.
+- PC에서는 설치된 Edge·Chrome을 쓰고, Vercel 서버에서는 서버용 크롬(`@sparticuz/chromium`)을 풀어서 씁니다(`lib/browser.ts`).
+- 서버 지역은 SGIS와 가까운 서울(`icn1`)로 정했습니다(`vercel.json`).
+- 서버는 한 번에 수집 1개만 처리합니다. 다른 사람이 수집 중이면 "다른 수집이 진행 중이에요" 안내가 나옵니다.
 
 ## 보안
 
