@@ -55,13 +55,40 @@ export async function launchBrowser(): Promise<Browser> {
   throw new BrowserNotFoundError();
 }
 
+/** Vercel 서버에서만 단계별 걸린 시간을 서버 기록에 남긴다(배포본 문제를 찾기 위함). 주소·시간만 남기고 비밀 값은 남기지 않는다 */
+export function trace(...parts: unknown[]): void {
+  if (isServerless()) console.log('[trace]', ...parts);
+}
+
+/**
+ * Vercel 서버의 임시 폴더(/tmp, 약 512MB)에서 크롬 문제 기록 파일(core.*)을 지우고 남은 공간(MB)을 돌려준다.
+ * 서버용 크롬은 닫힐 때 약 1.2GB짜리 core 파일을 남기는 일이 있어, 그대로 두면 임시 폴더가 가득 차
+ * 같은 서버에서 다음에 띄운 크롬이 페이지를 그리지 못하거나 꺼진다(2026-10-15 배포본에서 확인, DESIGN.md 11장).
+ */
+async function cleanServerTmp(): Promise<number | null> {
+  try {
+    const fs = await import('node:fs');
+    for (const name of fs.readdirSync('/tmp')) {
+      if (/^core(\.|$)/.test(name)) fs.rmSync(`/tmp/${name}`, { force: true });
+    }
+    const st = fs.statfsSync('/tmp');
+    return Math.round((st.bavail * st.bsize) / 1048576);
+  } catch {
+    return null;
+  }
+}
+
 /** 브라우저를 띄워 일을 맡기고, 성공하든 실패하든 끝나면 반드시 닫는다 */
 export async function withBrowser<T>(work: (browser: Browser) => Promise<T>): Promise<T> {
+  if (isServerless()) trace('tmpFree before launch', await cleanServerTmp(), 'MB');
+  const started = Date.now();
   const browser = await launchBrowser();
+  trace('launch', Date.now() - started, 'ms');
   try {
     return await work(browser);
   } finally {
     await browser.close();
+    if (isServerless()) trace('tmpFree after close', await cleanServerTmp(), 'MB');
   }
 }
 

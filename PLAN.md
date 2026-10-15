@@ -4,7 +4,7 @@
 - 작성자: 최윤라
 - 작성일: 2026-10-15 (2판 — 1판 `sgis-edu-locator` 계획은 `trash-can/2026-10-15_이전버전_공통위치찾기/`로 옮김)
 - 근거 문서: [PRD.md](PRD.md), [CLAUDE.md](CLAUDE.md), 담당자 요구사항 문서 `요구사항.docx`
-- PDCA 단계: **Plan**
+- PDCA 단계: **Plan → Design → Do 완료(2026-10-15)**
 
 ## 이번 사이클 목표
 
@@ -101,4 +101,5 @@ PRD의 must 2개(현행화 대상 그림·문장 찾기 / 정렬·병합 엑셀 
 ## 다음 단계
 
 - 2026-10-15 Design 완료: 작업 1~4 결과와 작업 5(타입 설계)는 [DESIGN.md](DESIGN.md), 점검 목록은 [CHECK.md](CHECK.md). 결정: Claude Opus 5.5, `@anthropic-ai/sdk` 설치, 실행 비밀번호.
-- 다음은 Do(구현) 단계: DESIGN.md 13장 순서 1번(패키지 설치·타입·안 쓰는 파일 정리)부터 한다.
+- 2026-10-15 Do 완료: DESIGN.md 13장 1~8번을 모두 구현하고 PC·배포본에서 처음부터 끝까지 확인했다(CHECK.md).
+- 다음은 Check 단계: 설계(DESIGN.md)와 실제 코드가 맞는지 차이 분석(gap analysis)을 하고, 남은 항목(CHECK.md의 부분 완료 FN-008, nice 1~3)을 정리한다.

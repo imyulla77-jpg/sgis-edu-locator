@@ -7,7 +7,7 @@
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
 import type { Page } from 'playwright-core';
-import { openPage, PAGE_TIMEOUT_MS, withBrowser } from './browser.ts';
+import { openPage, PAGE_TIMEOUT_MS, trace, withBrowser } from './browser.ts';
 import { extractDetail } from './refresh-extract.ts';
 import type { PageResult, PageTarget } from './refresh-types.ts';
 import { isAllowedUrl } from './url.ts';
@@ -55,15 +55,20 @@ type Attempt =
 /** 페이지를 한 번 열어 읽어 본다. 기다리는 시간은 60초와 남은 시간 중 짧은 쪽 */
 async function tryOpen(page: Page, target: PageTarget, waitMs: number, limitedByTime: boolean): Promise<Attempt> {
   try {
+    const t0 = Date.now();
     const response = await openPage(page, target.openUrl, waitMs);
+    trace('open', target.openUrl, Date.now() - t0, 'ms');
     // 사이트가 다른 주소로 넘겨줬으면(로그인 화면·다른 사이트 등) 그 화면은 읽지 않는다
     if (!isAllowedUrl(page.url())) return { ok: false, error: OFF_SITE_MESSAGE, cutByLimit: false };
     if (response && response.status() >= 400) return { ok: false, error: `페이지 응답 오류(${response.status()})`, cutByLimit: false };
+    const t1 = Date.now();
     const read = await extractDetail(page);
+    trace('extract', target.openUrl, Date.now() - t1, 'ms', 'img', read.images.length, 'sent', read.sentences.length);
     // 그림이 하나도 없으면 화면이 덜 그려졌을 수 있어 한 번 더 시도한다
     if (read.images.length === 0) return { ok: false, error: '본문 그림을 찾지 못함', cutByLimit: false };
     return { ok: true, result: read };
   } catch (error) {
+    trace('fail', target.openUrl, error instanceof Error ? `${error.name}: ${error.message.split('\n')[0]}` : 'unknown');
     const isTimeout = error instanceof Error && error.name === 'TimeoutError';
     if (isTimeout && limitedByTime) return { ok: false, error: '요청 시간 한도 초과', cutByLimit: true };
     // 오류 안내에는 기술 용어를 그대로 보여 주지 않는다

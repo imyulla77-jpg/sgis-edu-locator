@@ -4,7 +4,7 @@
 - 작성자: 최윤라
 - 작성일: 2026-10-15 (2판. 1판 설계는 `trash-can/2026-10-15_이전버전_공통위치찾기/DESIGN.md`)
 - 근거 문서: [PRD.md](PRD.md), [PLAN.md](PLAN.md), [CLAUDE.md](CLAUDE.md)
-- PDCA 단계: **Design**
+- PDCA 단계: **Design → Do 완료(2026-10-15)**
 
 ## 1. 전체 구조 한눈에
 
@@ -203,6 +203,8 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 
 ## 11. 보안
 
+- 배포본 비밀 값(2026-10-15 등록): Vercel 환경변수(Production, 숨김·Sensitive)에 `RUN_PASSWORD`를 먼저, `ANTHROPIC_API_KEY`를 나중에 넣었다(키만 열려 있는 순간이 없게). `RUN_PASSWORD` 값은 자동 생성해 `my-app2/.env.deploy`에만 적어 두었다 — `.gitignore`·`.vercelignore`의 `.env*`로 GitHub·Vercel에 올라가지 않고, Next는 이 이름의 파일을 읽지 않아 PC 실행에서는 비밀번호를 묻지 않는다. 비밀번호를 바꾸려면 Vercel 환경변수를 고친 뒤 다시 배포한다.
+- **배포 서버 임시 폴더 문제(2026-10-15 발견·해결)**: Vercel 함수의 /tmp(약 512MB)에 서버용 크롬이 닫힐 때 약 1.2GB짜리 문제 기록 파일(`core.chromium.*`)을 남겨, 같은 서버에서 요청이 이어지면 /tmp가 가득 차 크롬이 페이지 본문을 그리지 못하거나(그림 0개) 꺼졌다(40페이지 중 35개 실패, 120초 시간 초과). `lib/browser.ts`가 크롬을 켜기 전·끈 뒤에 `/tmp/core*`를 지우도록 고친 뒤 40페이지 수집 2번 연속·AI 포함 전체 실행 모두 실패 0. Vercel 서버에서만 단계별 걸린 시간·/tmp 남은 공간을 `[trace]`로 기록한다(주소·시간만, 비밀 값 없음).
 - `ANTHROPIC_API_KEY`, `RUN_PASSWORD`는 서버 코드에서만 읽는다(`NEXT_PUBLIC_` 금지). 빌드 결과물 화면 쪽 파일(`.next/static`)에 두 이름이 없는지 확인한다(PLAN SC-6).
 - `/api/judge`는 SGIS에듀 콘텐츠 그림 주소만 받아, 아무 그림이나 AI에 보내는 데 쓰이지 않게 한다.
 - 결과 엑셀은 내부용. GitHub·인터넷에 올리지 않는다(`*.xlsx`는 `.gitignore`에 있음).
@@ -252,7 +254,7 @@ scripts/
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
 6. 화면 3개 + `lib/run-steps.ts`, 1판 파일 `trash-can/`으로 (PLAN 15~17) — **2026-10-15 완료** (엑셀 다운로드 버튼은 구현 7까지 잠금)
 7. `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` (PLAN 18~21) — **2026-10-15 완료** (실제 결과로 4개 시트 확인, Excel로 열어 캡처·줄바꿈·링크 확인)
-8. 처음부터 끝까지 PC·배포본 확인, Vercel에 `ANTHROPIC_API_KEY`·`RUN_PASSWORD` 넣기 (PLAN 22)
+8. 처음부터 끝까지 PC·배포본 확인, Vercel에 `ANTHROPIC_API_KEY`·`RUN_PASSWORD` 넣기 (PLAN 22) — **2026-10-15 완료**: 비밀번호 없거나 틀리면 3개 API 모두 401, 배포본 화면에 비밀번호 칸 표시. 배포본 전체 실행 7분·40페이지 실패 0·그림 198개(대상 133·확인 필요 5)·시트 1 1,140행·엑셀 3.2MB·AI 약 1.29달러
 
 ## 변경 이력
 
@@ -266,3 +268,4 @@ scripts/
 | 2026-10-15 | 구현 5: `lib/records.ts`(시트 1 행)·`scripts/run-dev.ts`(`npm run refresh:dev`) 추가, AI 판단에 토큰 수(`usage`) 기록. 20행 대조에서 통계주제도 하위 메뉴(같은 주소, theme만 다름)를 잘못 고른 1건을 찾아 `lib/home-link.ts` 고침, 버튼 문구와 현재 메뉴가 다르면 비고에 적음. 무작위 그림 20개 연도 판독 20/20. 1900년 이전 연도만 있는 그림의 확인 필요 이유를 정확히 적도록 고침 |
 | 2026-10-15 | 구현 6: 시작·진행·결과 화면을 2판으로 교체, `lib/run-steps.ts` 추가(수집 4페이지씩·1초 간격·429 기다림·시간 초과 1번 더·처음 3개 연속 실패 중단·AI 3개씩), `site-check.ts`를 결과 모양과 무관하게 고침, 1판 코드 `trash-can/2026-10-15_1판_코드/`로, 창 제목 변경. 비밀번호 칸은 서버가 401을 돌려줄 때만 보임 |
 | 2026-10-15 | 구현 7: `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` 새로 씀, 결과 화면 [엑셀 다운로드] 연결, `scripts/run-dev.ts`도 엑셀을 함께 저장. Excel로 열어 보니 긴 글자 칸이 잘려 행 높이를 글자 양까지 고려하도록 고침. 다운로드 전 경고에 확인 필요 그림 수도 넣음 |
+| 2026-10-15 | 구현 8: Vercel에 `RUN_PASSWORD`(자동 생성, `.env.deploy`에만 보관)·`ANTHROPIC_API_KEY` 등록. 배포본에서 수집이 대부분 실패하는 문제를 찾아(크롬 core 파일이 /tmp를 채움) `lib/browser.ts`에서 정리하도록 고침, Vercel 서버 단계별 `[trace]` 기록 추가 |
