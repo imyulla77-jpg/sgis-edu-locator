@@ -1,4 +1,4 @@
-// 개발용 전체 실행 — 화면 없이 대상 찾기 → 수집 → AI 판단 → 시트 1 행 만들기를 실제로 돌려 dev-output/에 저장한다
+// 개발용 전체 실행 — 화면 없이 대상 찾기 → 수집 → AI 판단 → 시트 1 행 → 엑셀 만들기를 실제로 돌려 dev-output/에 저장한다
 // (DESIGN.md 12·13장, PLAN 작업 13·14)
 // 실행: npm run refresh:dev            (기본 시작 주소)
 //       npm run refresh:dev -- <주소>   (다른 시작 주소)
@@ -9,6 +9,8 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { JudgeBusyError, JUDGE_MODEL, judgeImage } from '../lib/ai-judge.ts';
+import { excelFileName } from '../lib/download.ts';
+import { buildWorkbook } from '../lib/excel.ts';
 import { buildRecords, fileNameOf } from '../lib/records.ts';
 import { collectPages, MAX_PAGES_PER_REQUEST } from '../lib/refresh-collect.ts';
 import type { Judgement, PageResult } from '../lib/refresh-types.ts';
@@ -144,6 +146,13 @@ async function main(): Promise<void> {
     lines.push(`| ${r.no} | ${r.kind} | ${where} | ${r.section} | ${what} | ${judged} ${r.note ? `· ${r.note}` : ''} | ${capture} |`);
   });
   writeFileSync(`${sampleDir}/sample.md`, lines.join('\n'));
+
+  // ⑦ 엑셀 (화면의 [엑셀 다운로드]와 같은 4개 시트)
+  const t3 = Date.now();
+  const xlsx = await buildWorkbook({ startUrl, finishedAt: new Date(), targets, results, judgements, records });
+  const xlsxFile = `${OUTPUT_DIR}/${excelFileName().replace('.xlsx', `_${runId}.xlsx`)}`;
+  writeFileSync(xlsxFile, Buffer.from(xlsx));
+  console.log(`엑셀: ${xlsxFile} · ${(xlsx.byteLength / 1024 / 1024).toFixed(1)}MB · ${seconds(Date.now() - t3)}`);
 
   console.log(JSON.stringify(summary, null, 1));
   console.log(`저장: ${file}, ${sampleDir}/sample.md`);

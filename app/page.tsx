@@ -1,12 +1,13 @@
 'use client';
 
 // 메인 화면 — 시작 → 진행 → 결과 상태 전환과 진행 지휘 (DESIGN.md 8장, PLAN 작업 15~17)
-// 결과는 브라우저 메모리에만 있다(DB 없음). 엑셀 다운로드는 PLAN 작업 18~21에서 연결한다.
+// 결과는 브라우저 메모리에만 있다(DB 없음). 엑셀은 [엑셀 다운로드]를 누를 때 브라우저 안에서 만든다(lib/download.ts).
 
 import { useEffect, useState } from 'react';
 import ProgressPanel from '@/components/ProgressPanel';
 import ResultSummary from '@/components/ResultSummary';
 import StartForm from '@/components/StartForm';
+import { downloadExcel } from '@/lib/download';
 import { RequestError, runAll, type RunOutcome, type RunProgress } from '@/lib/run-steps';
 import { DEFAULT_START_URL } from '@/lib/url';
 
@@ -21,6 +22,8 @@ export default function Home() {
   /** 서버가 실행 비밀번호를 요구했는지 (배포본) */
   const [askPassword, setAskPassword] = useState(false);
   const [lastUrl, setLastUrl] = useState(DEFAULT_START_URL);
+  /** 엑셀을 만드는 중이면 버튼에 보여 줄 글자, 아니면 null */
+  const [downloadLabel, setDownloadLabel] = useState<string | null>(null);
 
   // 진행·결과 화면에서 창을 닫거나 새로고침하려 하면 브라우저 기본 경고창을 띄운다
   // (결과는 브라우저 메모리에만 있어서 창을 닫으면 사라지기 때문. 문구는 브라우저가 정한다)
@@ -53,6 +56,20 @@ export default function Home() {
     }
   };
 
+  // [엑셀 다운로드]: 실패·확인 필요가 있으면 확인창 → 4개 시트 엑셀 만들기 → 내려받기 (PRD must 2)
+  const download = async () => {
+    if (screen.kind !== '결과' || downloadLabel) return;
+    setDownloadLabel('엑셀 만드는 중…');
+    try {
+      await downloadExcel(screen.outcome);
+    } catch (error) {
+      console.error('[엑셀 다운로드]', error);
+      window.alert('엑셀을 만드는 중 문제가 생겼어요. 다시 시도해 주세요.');
+    } finally {
+      setDownloadLabel(null);
+    }
+  };
+
   // [다시 검색]: 지금 결과를 지우고 시작 화면으로. 되돌릴 수 없으니 먼저 확인한다
   const restart = () => {
     if (window.confirm('지금 검색 결과가 사라져요. 다시 검색할까요?')) setScreen({ kind: '시작' });
@@ -76,7 +93,7 @@ export default function Home() {
 
         {screen.kind === '결과' && (
           <div className="flex flex-col gap-6">
-            <ResultSummary outcome={screen.outcome} />
+            <ResultSummary outcome={screen.outcome} onDownload={download} downloadLabel={downloadLabel} />
             <button
               type="button"
               onClick={restart}
