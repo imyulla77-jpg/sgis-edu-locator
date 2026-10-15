@@ -13,7 +13,7 @@ import { buildRecords, fileNameOf } from '../lib/records.ts';
 import { collectPages, MAX_PAGES_PER_REQUEST } from '../lib/refresh-collect.ts';
 import type { Judgement, PageResult } from '../lib/refresh-types.ts';
 import { JUDGE_SLOTS } from '../lib/server-limit.ts';
-import { SITE_UNAVAILABLE_MESSAGE } from '../lib/site-check.ts';
+import { isSiteUnavailable, SITE_UNAVAILABLE_MESSAGE } from '../lib/site-check.ts';
 import { loadTargets } from '../lib/targets.ts';
 import { DEFAULT_START_URL } from '../lib/url.ts';
 
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     results.push(...(await collectPages(targets.pages.slice(i, i + MAX_PAGES_PER_REQUEST))));
     const failed = results.filter((r) => r.status !== '성공').length;
     console.log(`  수집 [${results.length}/${targets.pages.length}] 실패 ${failed}`);
-    if (results.length >= 3 && results.slice(0, 3).every((r) => r.status !== '성공')) {
+    if (isSiteUnavailable(results)) {
       console.log(SITE_UNAVAILABLE_MESSAGE);
       return;
     }

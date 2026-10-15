@@ -205,38 +205,40 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 - 결과 엑셀은 내부용. GitHub·인터넷에 올리지 않는다(`*.xlsx`는 `.gitignore`에 있음).
 - `.env`가 Vercel 배포 파일에 섞여 올라가지 않도록 `.vercelignore`로 막았다(커밋 c2a2094).
 
-## 12. 폴더 구조 (2판 목표)
+## 12. 폴더 구조 (2판, 2026-10-15 화면 교체 후)
 
 ```
 app/
-  page.tsx                 시작·진행·결과 화면 (고쳐 씀)
-  api/targets/route.ts     (새) 대상 페이지 목록       ← api/menus 대체
-  api/refresh-collect/route.ts (새) 상세 페이지 수집   ← 화면 교체 때 1판 api/collect는 trash-can으로
-  api/judge/route.ts       (새) AI 연도 판단
+  page.tsx                 시작·진행·결과 화면 전환
+  layout.tsx               창 제목 "SGIS에듀 현행화 대상 찾기"
+  api/targets/route.ts     대상 페이지 목록·홈페이지 4개 메뉴
+  api/refresh-collect/route.ts 상세 페이지 수집 (최대 4페이지)
+  api/judge/route.ts       AI 연도 판단
 components/
-  StartForm.tsx            (고쳐 씀) 주소·비밀번호·검색 시작
-  ProgressPanel.tsx        (고쳐 씀) 3단계 진행률
-  ResultSummary.tsx        (고쳐 씀) 요약·다운로드
+  StartForm.tsx            주소·(필요할 때만) 실행 비밀번호·검색 시작
+  ProgressPanel.tsx        3단계(대상 찾기·페이지 수집·AI 판단) 진행률
+  ResultSummary.tsx        요약 숫자·실패·확인 필요·경고 목록·엑셀 다운로드 버튼
 lib/
-  refresh-types.ts         (새) 6장 타입  ← 화면 교체 때 1판 types.ts는 trash-can으로
-  url.ts, site-check.ts, server-limit.ts, browser.ts   (살려 씀)
-  run-password.ts          (새) 실행 비밀번호 검사
-  targets.ts               (새) 메뉴 읽기·목록 JSON·홈페이지 메뉴     ← menus.ts 대체
-  refresh-collect.ts       (새) 페이지 열기·재시도·시간 한도   ← 1판 collect.ts 대체
-  refresh-extract.ts       (새) 그림·소제목·바로가기·연도 문장·캡처   ← 1판 extract.ts 대체
-  home-link.ts             (새) 바로가기 → 홈페이지 경로
-  ai-judge.ts              (새) Claude 호출·판정
-  run-steps.ts             (고쳐 씀, ← run-batches.ts) 화면의 진행 지휘
-  records.ts               (새) 시트 1 행 만들기(항목 × 메뉴 위치, 홈페이지 경로 계산 포함)
-  group.ts                 (새로 씀) 그룹ID 매기기
-  excel.ts                 (새로 씀) 4개 시트
-  download.ts              (고쳐 씀) 경고·파일 이름
+  refresh-types.ts         6장 타입
+  url.ts, browser.ts       주소 검사·서버 브라우저 띄우기 (1판에서 살려 씀)
+  site-check.ts            "사이트 접속 불가" 판단 (2판 결과 모양에 맞춰 고침)
+  server-limit.ts          동시 실행 제한 (브라우저 1, AI 3)
+  run-password.ts          실행 비밀번호 검사
+  targets.ts               메뉴 읽기·목록 JSON·홈페이지 메뉴
+  refresh-collect.ts       페이지 열기·재시도·시간 한도
+  refresh-extract.ts       그림·소제목·바로가기·연도 문장·캡처
+  home-link.ts             바로가기 → 홈페이지 경로
+  ai-judge.ts              Claude 호출·판정
+  run-steps.ts             화면의 진행 지휘 (1판 collect-client.ts·run-batches.ts 대체)
+  records.ts               시트 1 행 만들기(항목 × 메뉴 위치, 홈페이지 경로 계산 포함)
+  group.ts                 (구현 7) 그룹ID 매기기
+  excel.ts                 (구현 7) 4개 시트
+  download.ts              (구현 7) 경고·파일 이름
 scripts/
-  run-dev.ts               (새, npm run refresh:dev) 화면 없이 전체 실행해 dev-output/에 저장하고 무작위 20행 대조표(sample.md·캡처)도 만든다
-                           ← 화면 교체 때 1판 collect-dev.ts·check-sample.ts는 trash-can으로
+  run-dev.ts               (npm run refresh:dev) 화면 없이 전체 실행해 dev-output/에 저장하고 무작위 20행 대조표(sample.md·캡처)도 만든다
 ```
 
-`trash-can/`으로 옮길 것(**화면을 2판으로 바꾸는 6번 작업 때 한꺼번에** — 그 전에 옮기면 1판 화면이 빌드되지 않아 배포본이 멈춘다): `lib/types.ts`, `lib/collect.ts`, `lib/extract.ts`, `app/api/collect`, `app/api/image`, `app/api/menus`, `lib/menus.ts`, `lib/menu-select.ts`, `lib/search.ts`, `lib/compare.ts`, `lib/past-result.ts`, `lib/thumbnail.ts`, `lib/collect-client.ts`(→ run-steps로 합침), `components/MenuPicker.tsx`, `components/PastCompare.tsx`, `components/ResultSearch.tsx`.
+1판 파일은 2026-10-15 화면 교체 때 `trash-can/2026-10-15_1판_코드/`로 옮겼다: `app/api/collect`·`image`·`menus`, `lib/types.ts`·`collect.ts`·`extract.ts`·`menus.ts`·`menu-select.ts`·`search.ts`·`compare.ts`·`past-result.ts`·`thumbnail.ts`·`collect-client.ts`·`run-batches.ts`·`group.ts`·`excel.ts`·`download.ts`, `components/MenuPicker.tsx`·`PastCompare.tsx`·`ResultSearch.tsx`, `scripts/collect-dev.ts`·`check-sample.ts`. `package.json`의 `collect:dev`·`check:sample`, `next.config.ts`의 1판 API 항목도 뺐다. `trash-can/`은 타입 검사·코드 검사에서 제외(`tsconfig.json`·`eslint.config.mjs`).
 
 ## 13. 구현 순서 (PLAN 작업 6~22와 연결)
 
@@ -245,7 +247,7 @@ scripts/
 3. `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts` + `/api/refresh-collect` (PLAN 7·8·11·12) — 1판 화면이 쓰는 파일과 이름이 겹치지 않게 `refresh-`를 붙임 — **2026-10-15 완료** (실제 40개: 실패 0, 그림 198개·캡처 실패 0, 바로가기 짝 42개, 연도 문장 204개·캡처 실패 0, 요청당 응답 최대 약 0.7MB)
 4. `lib/ai-judge.ts` + `/api/judge` (PLAN 9·10) — **2026-10-15 완료** (그림 8개 시험: 8개 모두 사람 판독과 일치, 그림당 2~5초)
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
-6. 화면 3개, 1판 파일 `trash-can/`으로 (PLAN 15~17)
+6. 화면 3개 + `lib/run-steps.ts`, 1판 파일 `trash-can/`으로 (PLAN 15~17) — **2026-10-15 완료** (엑셀 다운로드 버튼은 구현 7까지 잠금)
 7. `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` (PLAN 18~21)
 8. 처음부터 끝까지 PC·배포본 확인, Vercel에 `ANTHROPIC_API_KEY`·`RUN_PASSWORD` 넣기 (PLAN 22)
 
@@ -259,3 +261,4 @@ scripts/
 | 2026-10-15 | 구현 3: `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts`·`/api/refresh-collect` 추가. 소제목 영역 = 슬라이드, 바로가기는 같은 슬라이드 그림과만 짝(콘텐츠 전체 1개 규칙 폐기), 서버는 버튼만 돌려주고 홈페이지 경로는 화면에서 계산, 그림 캡처는 페이지 안 캔버스로, 문장 캡처는 복사본을 맨 위에 띄워 찍음(slick 이름표 제거), 요청당 최대 4페이지, 스스로하기 제목은 3단계 메뉴 이름 |
 | 2026-10-15 | 구현 4: `lib/ai-judge.ts`·`/api/judge` 추가, `lib/server-limit.ts`에 `JUDGE_SLOTS`(3). 구조화 출력은 JSON 스키마 직접 작성(zod 설치 안 함), `max_tokens` 4000, 그림 종류는 파일 첫 부분으로 판별 |
 | 2026-10-15 | 구현 5: `lib/records.ts`(시트 1 행)·`scripts/run-dev.ts`(`npm run refresh:dev`) 추가, AI 판단에 토큰 수(`usage`) 기록. 20행 대조에서 통계주제도 하위 메뉴(같은 주소, theme만 다름)를 잘못 고른 1건을 찾아 `lib/home-link.ts` 고침, 버튼 문구와 현재 메뉴가 다르면 비고에 적음. 무작위 그림 20개 연도 판독 20/20. 1900년 이전 연도만 있는 그림의 확인 필요 이유를 정확히 적도록 고침 |
+| 2026-10-15 | 구현 6: 시작·진행·결과 화면을 2판으로 교체, `lib/run-steps.ts` 추가(수집 4페이지씩·1초 간격·429 기다림·시간 초과 1번 더·처음 3개 연속 실패 중단·AI 3개씩), `site-check.ts`를 결과 모양과 무관하게 고침, 1판 코드 `trash-can/2026-10-15_1판_코드/`로, 창 제목 변경. 비밀번호 칸은 서버가 401을 돌려줄 때만 보임 |

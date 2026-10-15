@@ -1,58 +1,50 @@
 'use client';
 
-// 수집 중 화면 — 진행률·지금 묶음·과정별 현황·실패 수 (DESIGN.md 4.2장, PLAN 작업 17)
+// 진행 화면 — 단계 3개(대상 찾기·페이지 수집·AI 판단)와 지금 단계의 진행률 (DESIGN.md 8장, PLAN 작업 17)
 
-import type { RunProgress } from '@/lib/run-batches';
+import type { RunProgress, RunStep } from '@/lib/run-steps';
 
-interface ProgressPanelProps {
-  /** 아직 묶음 목록을 받기 전(메뉴 읽는 중)이면 null */
-  progress: RunProgress | null;
-}
+const STEPS: { step: RunStep; help: string }[] = [
+  { step: '대상 찾기', help: '메뉴를 읽어 검색할 상세 페이지 목록을 만들어요 (약 1분)' },
+  { step: '페이지 수집', help: '상세 페이지를 1초 간격으로 하나씩 열어 그림·문장을 모아요 (약 5분)' },
+  { step: 'AI 판단', help: '그림마다 AI가 그림 속 최고 연도를 읽어요 (약 3~5분)' },
+];
 
-export default function ProgressPanel({ progress }: ProgressPanelProps) {
-  if (!progress) {
-    return (
-      <div className="flex flex-col gap-3" aria-live="polite">
-        <p className="font-medium">메뉴를 읽는 중…</p>
-        <p className="text-sm text-zinc-500">초등·중학·고교 메인을 열어 수집할 페이지 목록을 만들고 있어요 (약 20초)</p>
-        <Bar percent={null} />
-      </div>
-    );
-  }
-
-  const { donePages, totalPages, failedPages, current, currentPages, courses } = progress;
-  const percent = totalPages > 0 ? Math.floor((donePages / totalPages) * 100) : 0;
+export default function ProgressPanel({ progress }: { progress: RunProgress }) {
+  const currentIndex = STEPS.findIndex((s) => s.step === progress.step);
+  const percent = progress.total > 0 ? Math.floor((progress.done / progress.total) * 100) : null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="font-medium" aria-live="polite">
-        수집 중… {donePages} / {totalPages} 페이지
-      </p>
-
-      <Bar percent={percent} />
-
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        지금: {current} ({currentPages}페이지)
-      </p>
-
-      <dl className="grid grid-cols-[4rem_1fr] gap-y-2 text-sm">
-        <dt className="text-zinc-500">과정별</dt>
-        <dd className="flex flex-wrap gap-x-5 gap-y-1">
-          {courses.map((c) => {
-            const finished = c.totalPages > 0 && c.donePages >= c.totalPages;
-            return (
-              <span key={c.course} className={finished ? 'text-green-700 dark:text-green-400' : undefined}>
-                {c.course} {c.donePages}/{c.totalPages}
-                {finished && ' ✔'}
-              </span>
-            );
-          })}
-        </dd>
-        <dt className="text-zinc-500">실패</dt>
-        <dd className={failedPages > 0 ? 'font-medium text-red-600' : undefined}>{failedPages}건</dd>
-      </dl>
-
-      <p className="text-sm text-zinc-500">ⓘ 창을 닫거나 새로고침하면 수집 결과가 사라져요.</p>
+    <div className="flex flex-col gap-5">
+      <ol className="flex flex-col gap-3">
+        {STEPS.map((s, i) => {
+          const state = i < currentIndex ? '끝' : i === currentIndex ? '진행 중' : '대기';
+          return (
+            <li key={s.step} className="flex flex-col gap-1">
+              <p className={`font-medium ${state === '대기' ? 'text-zinc-400' : ''}`}>
+                {state === '끝' ? '✔' : `${i + 1}.`} {s.step}
+                {state === '진행 중' && progress.total > 0 && (
+                  <span className="ml-2 font-normal tabular-nums" aria-live="polite">
+                    {progress.done} / {progress.total}
+                    {progress.problems > 0 && (
+                      <span className="ml-2 text-red-600">
+                        {s.step === 'AI 판단' ? '확인 필요' : '실패'} {progress.problems}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </p>
+              {state === '진행 중' && (
+                <>
+                  <p className="text-sm text-zinc-500">{s.help}</p>
+                  <Bar percent={percent} />
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-sm text-zinc-500">ⓘ 창을 닫거나 새로고침하면 결과가 사라져요.</p>
     </div>
   );
 }
@@ -62,7 +54,7 @@ function Bar({ percent }: { percent: number | null }) {
   return (
     <div
       role="progressbar"
-      aria-label="수집 진행률"
+      aria-label="진행률"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent ?? undefined}
