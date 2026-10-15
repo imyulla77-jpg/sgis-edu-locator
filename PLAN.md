@@ -4,7 +4,7 @@
 - 작성자: 최윤라
 - 작성일: 2026-10-15 (2판 — 1판 `sgis-edu-locator` 계획은 `trash-can/2026-10-15_이전버전_공통위치찾기/`로 옮김)
 - 근거 문서: [PRD.md](PRD.md), [CLAUDE.md](CLAUDE.md), 담당자 요구사항 문서 `요구사항.docx`
-- PDCA 단계: **Plan → Design → Do 완료(2026-10-15)**
+- PDCA 단계: **Plan → Design → Do → Check(약 90%) → Act 1차(약 98%) → Report 완료 (2026-10-15)**
 
 ## 이번 사이클 목표
 
@@ -107,3 +107,7 @@ PRD의 must 2개(현행화 대상 그림·문장 찾기 / 정렬·병합 엑셀 
 ## Check 단계 (2026-10-15)
 
 - gap-detector 분석 결과 일치율 약 90%: [docs/03-analysis/sgis-edu-refresh.analysis.md](docs/03-analysis/sgis-edu-refresh.analysis.md)
+
+## Report 단계 (2026-10-15)
+
+- 완료 보고서: [docs/04-report/sgis-edu-refresh.report.md](docs/04-report/sgis-edu-refresh.report.md). 성공 기준 SC-1~6 모두 달성. 남은 일(G-08·G-09·nice 1~3·운영 부서 확인)은 보고서 7장.

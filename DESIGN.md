@@ -4,7 +4,7 @@
 - 작성자: 최윤라
 - 작성일: 2026-10-15 (2판. 1판 설계는 `trash-can/2026-10-15_이전버전_공통위치찾기/DESIGN.md`)
 - 근거 문서: [PRD.md](PRD.md), [PLAN.md](PLAN.md), [CLAUDE.md](CLAUDE.md)
-- PDCA 단계: **Design → Do 완료 → Check(약 90%) → Act 1차(재분석 약 98%) (2026-10-15)**
+- PDCA 단계: **Design → Do 완료 → Check(약 90%) → Act 1차(재분석 약 98%) → Report 완료 (2026-10-15)**
 
 ## 1. 전체 구조 한눈에
 
