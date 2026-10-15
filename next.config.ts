@@ -9,9 +9,10 @@ const BROWSER_FILES = [
 ];
 
 const nextConfig: NextConfig = {
-  // Vercel에 배포할 때 위 파일들이 자동으로 실리지 않아, 이 두 API에 함께 싣는다.
+  // Vercel에 배포할 때 위 파일들이 자동으로 실리지 않아, 브라우저를 띄우는 API에 함께 싣는다.
   outputFileTracingIncludes: {
     "/api/menus": BROWSER_FILES,
+    "/api/targets": BROWSER_FILES,
     "/api/collect": BROWSER_FILES,
   },
 };

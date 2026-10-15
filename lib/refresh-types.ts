@@ -38,6 +38,22 @@ export interface PageTarget {
   locations: MenuLocation[];
 }
 
+/** SGIS 홈페이지 4개 메뉴의 하위 메뉴 하나 (홈페이지 상단 메뉴에서 매번 읽음) */
+export interface HomeMenuItem {
+  menu: HomeMenu;
+  /** 예: 지방의 변화보기 */
+  name: string;
+  url: string;
+}
+
+/** /api/targets 결과 */
+export interface TargetList {
+  pages: PageTarget[];
+  homeMenus: HomeMenuItem[];
+  /** 화면에 보여 줄 주의 문장 (표의 메뉴를 사이트에서 못 찾음 등) */
+  warnings: string[];
+}
+
 /** 바로가기 버튼으로 찾은 SGIS 홈페이지 경로 */
 export interface HomeLink {
   /** 4개 메뉴 밖이면 null → "홈페이지 경로 없음" */

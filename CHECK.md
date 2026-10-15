@@ -10,8 +10,8 @@
 | ID | 점검 내용 | 근거 | 상태 |
 |---|---|---|---|
 | FN-001 | `https://sgis.mods.go.kr/` 밖의 시작 주소는 검색을 시작하지 않고 안내 | PRD 6장 수집 | 미완료 |
-| FN-002 | PRD 4장 표의 3단계 메뉴만 골라 대상 40개(콘텐츠 38 + 스스로하기 2)를 만들고, 표 이름과 맞지 않는 메뉴는 경고 | DESIGN 2.1 | 미완료 |
-| FN-003 | 같은 콘텐츠는 한 번만 열고, 나오는 메뉴 위치를 모두 붙임 | DESIGN 2.1 | 미완료 |
+| FN-002 | PRD 4장 표의 3단계 메뉴만 골라 대상 40개(콘텐츠 38 + 스스로하기 2)를 만들고, 표 이름과 맞지 않는 메뉴는 경고 | DESIGN 2.1 | 완료 |
+| FN-003 | 같은 콘텐츠는 한 번만 열고, 나오는 메뉴 위치를 모두 붙임 | DESIGN 2.1 | 완료 |
 | FN-004 | 페이지 1초 이상 간격·하나씩, 60초 대기, 2번 재시도, 처음 3개 연속 실패 시 중단 | PRD 6장 | 미완료 |
 | FN-005 | 본문 내용 그림만 수집(`_thumb`·추천 카드·장식·`/upload/` 제외) | DESIGN 2.2 | 미완료 |
 | FN-006 | 바로가기 버튼으로 홈페이지 경로(4개 메뉴 > 하위 · 주소)를 정하고, 없으면 "홈페이지 경로 없음" | DESIGN 2.3 | 미완료 |
@@ -32,7 +32,7 @@
 | SEC-001 | 모든 API가 받은 주소를 `isAllowedUrl`로 다시 검사 | CLAUDE.md 9장 | 미완료 |
 | SEC-002 | 브라우저 API는 `tryAcquire` 1개, AI API는 3개까지(넘으면 429) | DESIGN 7장 | 미완료 |
 | SEC-003 | 다른 사이트에서 온 요청은 403 (`crossSiteResponse`) | DESIGN 7장 | 미완료 |
-| SEC-004 | `RUN_PASSWORD`가 있으면 비밀번호 없거나 틀린 요청은 401, 비교는 `timingSafeEqual` | DESIGN 7장 | 미완료 |
+| SEC-004 | `RUN_PASSWORD`가 있으면 비밀번호 없거나 틀린 요청은 401, 비교는 `timingSafeEqual` | DESIGN 7장 | 미완료 (/api/targets 적용, 나머지 API는 만들 때) |
 | SEC-005 | `ANTHROPIC_API_KEY`·`RUN_PASSWORD`가 화면 쪽 빌드 파일·로그·엑셀·오류 메시지에 없음 | DESIGN 11장 | 미완료 |
 | SEC-006 | `/api/judge`는 SGIS에듀 콘텐츠 그림 주소(`/sgis_edu/resource/images/contents/`)만 받음 | DESIGN 11장 | 미완료 |
 | SEC-007 | 게시판·로그인·이용자 등록 콘텐츠를 열거나 수집하지 않음 | PRD 6장 | 미완료 |

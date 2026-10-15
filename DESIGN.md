@@ -30,7 +30,7 @@
 
 | 구분 | 읽는 방법 | 결과 |
 |---|---|---|
-| 수업하기 3단계 | 각 과정 메인 상단 메뉴의 `classList?thema_id=…` 링크 이름을 PRD 4장 표와 띄어쓰기 무시 비교 → 목록 데이터 `POST /ServiceAPI/edu/eduContentsList.json` (`thema_id`, `currentPageIndex`) | 초등 E01~E03 8개, 중학 M01~M04 12개, 고교 H01~H05 18개 = **38개 콘텐츠** |
+| 수업하기 3단계 | 각 과정 메인 상단 메뉴의 `classList?thema_id=…` 링크 이름을 PRD 4장 표와 띄어쓰기 무시 비교(똑같은 이름이 없으면 조사 "의"까지 무시 — 표 "우리나라의 인구변화" ↔ 사이트 "우리나라 인구변화") → 목록 데이터 `POST /ServiceAPI/edu/eduContentsList.json` (`thema_id`, `currentPageIndex`) | 초등 E01~E03 8개, 중학 M01~M04 12개, 고교 H01~H05 18개 = **38개 콘텐츠** |
 | 주제보기 3단계 | 상단 메뉴 `issueList?issue_id=IS_0n` → `POST /ServiceAPI/edu/eduIssueContentsList.json` (`issue_id`, `currentPageIndex`) | 6개 주제에 38개 콘텐츠(수업하기와 **같은 38개**). 과정과 상관없이 같은 목록 |
 | 스스로하기 3단계 (초등만) | 상단 메뉴 `myself/ppltnChange`, `myself/weatherChange` | 메뉴 자체가 내용 화면 2개(단계 탭 안에 그림) |
 
@@ -49,7 +49,8 @@
 
 - 콘텐츠마다 바로가기 버튼이 1~2개 있다(38개 콘텐츠에 42개). 모양: `<button class="dirctBtn" onclick="window.open('/statbd/future_01.vw')">SGIS 분석지도(지방의 변화보기) 바로가기</button>`
 - 버튼 문구에서 **메뉴**(통계주제도·대화형 통계지도·활용서비스·분석지도)와 **하위 이름**(괄호 안)을, `onclick`에서 **주소**를 읽는다. 문구의 `｢ ｣`, "대화형통계지도"처럼 띄어쓰기가 다른 표기는 정리해서 맞춘다.
-- SGIS 홈페이지 메인(`https://sgis.mods.go.kr/`)의 상단 메뉴를 매번 읽어, 바로가기 주소가 4개 메뉴 중 어디 아래인지 **주소로** 확인한다. 주소가 메뉴 목록에 없으면 버튼 문구로 정하고 비고에 "버튼 문구 기준"이라 적는다. 4개 메뉴가 아니면 "홈페이지 경로 없음".
+- SGIS 홈페이지 메인(`https://sgis.mods.go.kr/`)의 상단 메뉴를 매번 읽어, 바로가기 주소가 4개 메뉴 중 어디 아래인지 **주소로** 확인한다. 상단 메뉴(`#gnb > ul > li`)에는 1단계 이름만 있고, 하위 메뉴는 같은 순서로 놓인 사이트맵(`.headerDiv .subMenu .inner > div > ul`)에 있다(2026-10-15 기준 4개 메뉴 하위 32개). 두 목록 개수가 다르면 경고하고 버튼 문구로만 정한다.
+- 바로가기 주소 중 메뉴 목록과 똑같지 않은 것이 있다(예: `/jsp/pyramid/pyramid2.jsp` ↔ 메뉴 `/jsp/pyramid/pyramid1.jsp`, `/publicsmodel/newAging.vw` ↔ `/publicsmodel/`). 그래서 맞추는 순서는 ① 주소(물음표 앞) 똑같음 → ② 같은 폴더(마지막 `/` 앞) → ③ 버튼 문구(비고 "버튼 문구 기준")로 한다(구현 3에서 적용). 주소가 메뉴 목록에 없으면 버튼 문구로 정하고 비고에 "버튼 문구 기준"이라 적는다. 4개 메뉴가 아니면 "홈페이지 경로 없음".
 - 그림과 버튼 짝짓기: 같은 소제목 영역 안의 버튼. 영역에 버튼이 없으면 콘텐츠 전체에 버튼이 1개일 때만 그 버튼을 쓰고, 2개 이상이면 "홈페이지 경로 없음(버튼 위치 불분명)".
 
 ## 3. 결정 사항 (담당자 결정 2026-10-15)
@@ -113,7 +114,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 
 | API | 받는 것 | 돌려주는 것 | 시간 한도 | 동시 실행 |
 |---|---|---|---|---|
-| `POST /api/targets` | `{ startUrl }` | `{ pages: PageTarget[], homeMenus, warnings }` (메인 3개 + 홈페이지 메인 열기, 목록 JSON 읽기) | 60초 | 브라우저 1 |
+| `POST /api/targets` | `{ startUrl }` | `TargetList { pages: PageTarget[], homeMenus: HomeMenuItem[], warnings }` (시작·메인 3개·홈페이지 메인 열기, 목록 JSON 읽기 — 모두 1초 간격. 실측 약 48초) | 120초(안에서 100초 한도) | 브라우저 1 |
 | `POST /api/collect` | `{ pages: PageTarget[] }` (최대 6개) | `{ results: PageResult[] }` | 120초(안에서 100초 넘으면 남은 것은 "시간 초과") | 브라우저 1 |
 | `POST /api/judge` | `{ src }` (`/sgis_edu/resource/images/contents/` 그림만) | `Judgement` | 60초 | AI 3 |
 
@@ -228,9 +229,9 @@ scripts/
 ## 13. 구현 순서 (PLAN 작업 6~22와 연결)
 
 1. `@anthropic-ai/sdk` 설치(0.134.0), `lib/refresh-types.ts` 만들기 (PLAN 5) — **2026-10-15 완료**
-2. `lib/targets.ts` + `/api/targets` (PLAN 6)
+2. `lib/targets.ts` + `/api/targets` + `lib/run-password.ts` (PLAN 6) — **2026-10-15 완료** (실제 사이트: 대상 40개, 위치 154곳, 경고 0, 약 48초)
 3. `lib/collect.ts`·`lib/extract.ts`·`lib/home-link.ts` + `/api/collect` (PLAN 7·8·11·12)
-4. `lib/ai-judge.ts` + `/api/judge` + `lib/run-password.ts` (PLAN 9·10)
+4. `lib/ai-judge.ts` + `/api/judge` (PLAN 9·10)
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
 6. 화면 3개, 1판 파일 `trash-can/`으로 (PLAN 15~17)
 7. `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` (PLAN 18~21)
@@ -242,3 +243,4 @@ scripts/
 |---|---|
 | 2026-10-15 | 2판 처음 작성 (요구사항 문서 기준, 사이트 조사 결과·담당자 결정 반영) |
 | 2026-10-15 | 구현 1: SDK 설치, 타입을 `lib/refresh-types.ts`로(1판 화면 유지 위해), 그림 캡처를 AI 판단이 아닌 수집 때 서버 브라우저가 찍도록 바꿈(그림 줄이기 패키지가 필요 없게), 1판 파일 정리는 화면 교체 작업으로 미룸 |
+| 2026-10-15 | 구현 2: `lib/targets.ts`·`/api/targets`·`lib/run-password.ts` 추가. 표 이름 맞추기에 조사 "의" 무시 단계 추가, 홈페이지 하위 메뉴는 사이트맵에서 읽음, 바로가기 주소 맞추는 순서(주소→폴더→문구) 정함, `/api/targets` 시간 한도 120초로 늘림(실측 48초) |
