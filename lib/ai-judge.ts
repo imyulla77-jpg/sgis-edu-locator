@@ -155,6 +155,8 @@ export async function judgeImage(src: string): Promise<Judgement> {
     return { ...base, error: `그림을 받지 못함(${error instanceof Error ? error.message : '알 수 없음'})` };
   }
   const sha256 = createHash('sha256').update(image.bytes).digest('hex');
+  // 키가 없으면(배포본에 아직 안 넣음 등) AI를 부르지 않는다
+  if (!process.env.ANTHROPIC_API_KEY) return { ...base, sha256, error: 'AI 키가 설정되지 않음(ANTHROPIC_API_KEY)' };
 
   try {
     const { reading, model } = await readYears(image.bytes, image.mediaType);
