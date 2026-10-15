@@ -3,7 +3,7 @@
 - 기능 이름(PDCA): `sgis-edu-refresh` (2판)
 - 작성자: 최윤라
 - 작성일: 2026-10-15
-- 근거: 담당자 요구사항 문서 `요구사항.docx`, [PRD.md](../../PRD.md), [PLAN.md](../../PLAN.md), [DESIGN.md](../../DESIGN.md), [CHECK.md](../../CHECK.md), [차이 분석](../03-analysis/sgis-edu-refresh.analysis.md)
+- 근거: 담당자 요구사항 문서 `요구사항.docx`, [PRD.md](../../../../PRD.md), [PLAN.md](../../../../PLAN.md), [DESIGN.md](../../../../DESIGN.md), [CHECK.md](../../../../CHECK.md), [차이 분석](sgis-edu-refresh.analysis.md)
 - 배포 주소: https://sgis-edu-locator.vercel.app (실행 비밀번호 필요)
 - 마지막 커밋: `4c4dfde` (이 보고서 커밋 제외)
 
@@ -107,4 +107,4 @@
 ## 8. 다음 단계
 
 - 담당자가 실제 엑셀을 받아 "수정 후"를 채우며 써 보고, 불편한 점을 모아 다음 사이클(G-08·G-09·nice) 여부를 정한다.
-- PDCA 마무리: 이 보고서 확인 후 `sgis-edu-refresh`를 완료(archive)로 둔다.
+- PDCA 마무리: 2026-10-16 `sgis-edu-refresh`를 완료(archive) 처리하고 분석·보고서를 이 폴더로 옮김. PRD·PLAN·DESIGN·CHECK는 프로젝트 기준 문서라 맨 위 폴더에 그대로 둠.

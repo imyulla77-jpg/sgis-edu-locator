@@ -106,8 +106,8 @@ PRD의 must 2개(현행화 대상 그림·문장 찾기 / 정렬·병합 엑셀 
 
 ## Check 단계 (2026-10-15)
 
-- gap-detector 분석 결과 일치율 약 90%: [docs/03-analysis/sgis-edu-refresh.analysis.md](docs/03-analysis/sgis-edu-refresh.analysis.md)
+- gap-detector 분석 결과 일치율 약 90%: [docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.analysis.md](docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.analysis.md)
 
 ## Report 단계 (2026-10-15)
 
-- 완료 보고서: [docs/04-report/sgis-edu-refresh.report.md](docs/04-report/sgis-edu-refresh.report.md). 성공 기준 SC-1~6 모두 달성. 남은 일(G-08·G-09·nice 1~3·운영 부서 확인)은 보고서 7장.
+- 완료 보고서: [docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.report.md](docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.report.md). 성공 기준 SC-1~6 모두 달성. 남은 일(G-08·G-09·nice 1~3·운영 부서 확인)은 보고서 7장.

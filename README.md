@@ -92,8 +92,8 @@ https://sgis-edu-locator.vercel.app 에서 PC 설치 없이 쓸 수 있습니다
 | [PLAN.md](PLAN.md) | 개발 계획: 성공 기준 SC-1~6, 작업 순서 |
 | [DESIGN.md](DESIGN.md) | 설계: 사이트 조사, AI 판단, API, 화면, 엑셀, 보안 |
 | [CHECK.md](CHECK.md) | 점검 목록: 기능·보안·검증 항목과 상태 |
-| [docs/03-analysis](docs/03-analysis/sgis-edu-refresh.analysis.md) | 설계-구현 차이 분석 (90% → Act 뒤 98%) |
-| [docs/04-report](docs/04-report/sgis-edu-refresh.report.md) | 완료 보고서 |
+| [분석(보관)](docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.analysis.md) | 설계-구현 차이 분석 (90% → Act 뒤 98%) |
+| [보고서(보관)](docs/archive/2026-10/sgis-edu-refresh/sgis-edu-refresh.report.md) | 완료 보고서 |
 | [CLAUDE.md](CLAUDE.md) | AI 작업 규칙 |
 
 작성: 최윤라
