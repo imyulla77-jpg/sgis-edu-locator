@@ -1,11 +1,12 @@
 // [서버 전용] 상세 페이지 몇 개 수집 — 페이지 열기·재시도·시간 한도 (DESIGN.md 7장, PLAN 작업 7)
-// 페이지가 열리면 refresh-extract.ts의 extractDetail로 그림·연도 문장을 읽고 캡처한다.
+// 페이지가 열리면 refresh-extract.ts의 extractDetail로 그림·연도 문장을 읽고 캡처한 뒤, 그림 파일 지문(sha256)을 붙인다.
 // - 한 번에 한 페이지씩, 페이지마다 1초 이상 쉬고 연다
 // - 페이지당 최대 60초 기다리고, 실패하면 최대 2번 다시 시도 → 그래도 안 되면 "수집 실패"
 // - 시작 후 100초가 지나면 새 페이지를 열지 않고 남은 페이지를 "시간 초과"로 돌려준다
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
 
+import { createHash } from 'node:crypto';
 import type { Page } from 'playwright-core';
 import { openPage, PAGE_TIMEOUT_MS, trace, withBrowser } from './browser.ts';
 import { extractDetail } from './refresh-extract.ts';
@@ -48,24 +49,48 @@ export interface CollectOptions {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** 그림 파일 하나를 받을 때 기다리는 최대 시간 */
+const IMAGE_TIMEOUT_MS = 10_000;
+
+/**
+ * 그림 파일을 받아 파일 지문(sha256)을 만든다. 받지 못하면 null(그 그림은 주소별로 따로 판단된다).
+ * sgis.mods.go.kr 밖의 그림은 받지 않고, 다른 주소로 넘겨주는 응답은 따라가지 않는다.
+ */
+async function fingerprint(page: Page, src: string, timeoutMs: number): Promise<string | null> {
+  if (!isAllowedUrl(src)) return null;
+  try {
+    const response = await page.request.get(src, { timeout: timeoutMs, maxRedirects: 0 });
+    if (!response.ok()) return null;
+    return createHash('sha256').update(await response.body()).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
 type Attempt =
   | { ok: true; result: Omit<PageResult, 'target' | 'status' | 'seconds'> & { title: string } }
   | { ok: false; error: string; cutByLimit: boolean };
 
 /** 페이지를 한 번 열어 읽어 본다. 기다리는 시간은 60초와 남은 시간 중 짧은 쪽 */
-async function tryOpen(page: Page, target: PageTarget, waitMs: number, limitedByTime: boolean): Promise<Attempt> {
+async function tryOpen(page: Page, target: PageTarget, waitMs: number, limitedByTime: boolean, deadline: number): Promise<Attempt> {
   try {
     const t0 = Date.now();
     const response = await openPage(page, target.openUrl, waitMs);
     trace('open', target.openUrl, Date.now() - t0, 'ms');
-    // 사이트가 다른 주소로 넘겨줬으면(로그인 화면·다른 사이트 등) 그 화면은 읽지 않는다
-    if (!isAllowedUrl(page.url())) return { ok: false, error: OFF_SITE_MESSAGE, cutByLimit: false };
+    // 사이트가 다른 주소로 넘겨줬으면(다른 사이트, 또는 같은 사이트의 로그인·게시판 화면 등) 그 화면은 읽지 않는다(분석 G-11)
+    if (!isDetailPage(page.url())) return { ok: false, error: OFF_SITE_MESSAGE, cutByLimit: false };
     if (response && response.status() >= 400) return { ok: false, error: `페이지 응답 오류(${response.status()})`, cutByLimit: false };
     const t1 = Date.now();
     const read = await extractDetail(page);
     trace('extract', target.openUrl, Date.now() - t1, 'ms', 'img', read.images.length, 'sent', read.sentences.length);
     // 그림이 하나도 없으면 화면이 덜 그려졌을 수 있어 한 번 더 시도한다
     if (read.images.length === 0) return { ok: false, error: '본문 그림을 찾지 못함', cutByLimit: false };
+    // 그림 파일 지문: 주소가 달라도 내용이 같은 그림을 AI에 한 번만 보내기 위함(DESIGN.md 4장, 분석 G-01)
+    //   요청 시간 한도가 2초 안으로 남으면 더 받지 않고 지문 없이 둔다(그 그림은 주소별로 판단됨, 분석 R-07)
+    for (const image of read.images) {
+      if (deadline - Date.now() < 2_000) break;
+      image.sha256 = await fingerprint(page, image.src, Math.min(IMAGE_TIMEOUT_MS, deadline - Date.now() - 1_000));
+    }
     return { ok: true, result: read };
   } catch (error) {
     trace('fail', target.openUrl, error instanceof Error ? `${error.name}: ${error.message.split('\n')[0]}` : 'unknown');
@@ -108,7 +133,7 @@ export async function collectPages(targets: PageTarget[], options: CollectOption
           break;
         }
         const waitMs = Math.min(pageTimeoutMs, timeLeft());
-        const outcome = await tryOpen(page, target, waitMs, waitMs < pageTimeoutMs);
+        const outcome = await tryOpen(page, target, waitMs, waitMs < pageTimeoutMs, deadline);
         if (outcome.ok) {
           const { title, ...read } = outcome.result;
           // 제목: 목록 데이터의 제목 → (스스로하기처럼 메뉴 자체가 내용 화면이면) 3단계 메뉴 이름 → 페이지에서 읽은 제목

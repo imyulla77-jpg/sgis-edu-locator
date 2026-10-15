@@ -10,11 +10,6 @@ export const RUN_PASSWORD_HEADER = 'x-run-password';
 
 export const RUN_PASSWORD_MESSAGE = '실행 비밀번호가 맞지 않아요';
 
-/** 비밀번호가 필요한지 (화면이 비밀번호 칸을 보일지 정할 때 씀) */
-export function isPasswordRequired(): boolean {
-  return Boolean(process.env.RUN_PASSWORD);
-}
-
 /** 비밀번호가 맞거나 필요 없으면 null, 틀렸으면 401 응답을 돌려준다 */
 export function passwordResponse(request: Request): Response | null {
   const expected = process.env.RUN_PASSWORD;

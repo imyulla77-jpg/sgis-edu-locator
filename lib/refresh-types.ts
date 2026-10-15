@@ -1,5 +1,5 @@
 // 2판(현행화 대상 찾기) 화면과 서버가 함께 쓰는 데이터 모양 (DESIGN.md 6장)
-// 1판 lib/types.ts는 화면을 2판으로 바꿀 때까지 그대로 두고, 2판 코드는 이 파일만 쓴다.
+// (1판 lib/types.ts는 2026-10-15 화면 교체 때 trash-can으로 옮겼다.)
 
 /** 검색하는 과정 */
 export type Course = '초등' | '중학' | '고교';
@@ -82,6 +82,8 @@ export interface FoundImage {
   indexInSection: number;
   /** 그림 캡처 (JPEG base64, 긴 변 최대 400픽셀, 엑셀 "캡처" 칸). 그리지 못하면 null */
   capture: string | null;
+  /** 그림 파일 내용 지문(sha256). 수집 때 서버가 그림을 받아 만든다. 받지 못하면 null (같은 내용 그림은 AI에 한 번만 보냄) */
+  sha256: string | null;
   /** 같은 소제목 영역의 바로가기 버튼. 없거나 짝을 정할 수 없으면 null (홈페이지 경로는 화면이 home-link.ts로 정함) */
   button: DirectButton | null;
   /** button이 null인 이유 */

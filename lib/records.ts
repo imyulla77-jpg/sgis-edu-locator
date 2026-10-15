@@ -46,7 +46,7 @@ export function buildRecords(results: PageResult[], judgements: Map<string, Judg
             section,
             imageIndex: image.indexInSection,
             src: image.src,
-            sha256: j?.sha256 ?? null,
+            sha256: image.sha256 ?? j?.sha256 ?? null, // 수집 때 만든 지문을 먼저 써서 AI 판단과 같은 묶음 기준을 쓴다(분석 R-06)
             years: j?.years ?? [],
             maxYear: j?.maxYear ?? null,
             verdict: j?.verdict ?? '확인 필요',

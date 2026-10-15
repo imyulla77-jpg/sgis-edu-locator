@@ -1,16 +1,17 @@
 // [화면] 진행 지휘 — 대상 찾기 → 페이지 수집 → AI 판단 → 시트 1 행 (DESIGN.md 1·7·8장, PLAN 작업 15)
 // 서버 API를 차례로 부르고 진행 상황을 알린다. 브라우저 조종·AI 호출은 서버가 하고, 여기서는 순서만 정한다.
-// - 수집: 4페이지씩, 앞 응답을 받은 뒤 1초 쉬고 다음 요청. 처음 3페이지 연속 실패면 전체를 멈춘다.
+// - 수집: 첫 요청 3페이지, 그 뒤 4페이지씩. 앞 응답을 받은 뒤 1초 쉬고 다음 요청. 처음 3페이지 연속 실패면 전체를 멈춘다.
 //         "시간 초과" 페이지는 맨 뒤에 1번만 다시 보낸다
-// - AI 판단: 같은 주소의 그림은 한 번만, 한 번에 3개까지
-// - 서버가 "앞 작업 중"(429)이면 실패로 세지 않고 5초 쉬었다 다시 보낸다
+// - AI 판단: 파일 내용(지문)이 같은 그림은 한 번만(lib/judge-plan.ts), 한 번에 3개까지
+// - 서버가 "앞 작업 중"(429)이면 실패로 세지 않고 5초씩 쉬며 최대 150초까지 다시 보낸다
 // 실행 비밀번호는 메모리에만 두고 머리말로 보낸다(저장하지 않음).
 //
 // 화면에서 쓰지만 시험할 때 Node에서도 부를 수 있도록 lib 파일은 상대 경로 + .ts 확장자로 불러온다.
 
+import { planJudging, spreadJudgements } from './judge-plan.ts';
 import { buildRecords } from './records.ts';
 import type { Judgement, PageResult, PageTarget, RecordRow, TargetList } from './refresh-types.ts';
-import { isSiteUnavailable, SITE_UNAVAILABLE_MESSAGE } from './site-check.ts';
+import { FIRST_PAGES_TO_CHECK, isSiteUnavailable, SITE_UNAVAILABLE_MESSAGE } from './site-check.ts';
 
 /** 한 번에 수집을 맡기는 페이지 수 (서버 MAX_PAGES_PER_REQUEST와 같게) */
 const PAGES_PER_REQUEST = 4;
@@ -164,9 +165,12 @@ export async function runAll(startUrl: string, onProgress: (p: RunProgress) => v
       problems: results.filter((r) => r.status === '수집 실패').length,
     });
   report();
-  for (let i = 0; i < total; i += PAGES_PER_REQUEST) {
+  // 첫 요청은 3페이지만 보내 "처음 3페이지 연속 실패"를 4번째 페이지를 열기 전에 판단한다(분석 G-10)
+  for (let i = 0; i < total; ) {
+    const size = i === 0 ? FIRST_PAGES_TO_CHECK : PAGES_PER_REQUEST;
     if (i > 0) await sleep(GAP_MS);
-    results.push(...(await collectChunk(targets.pages.slice(i, i + PAGES_PER_REQUEST), config)));
+    results.push(...(await collectChunk(targets.pages.slice(i, i + size), config)));
+    i += size;
     report();
     if (isSiteUnavailable(results)) throw new RequestError(SITE_UNAVAILABLE_MESSAGE);
   }
@@ -182,26 +186,28 @@ export async function runAll(startUrl: string, onProgress: (p: RunProgress) => v
     report();
   }
 
-  // ③ AI 판단 (같은 주소는 한 번만, 3개씩)
-  const srcs = [...new Set(results.flatMap((r) => r.images.map((img) => img.src)))];
-  const judgements = new Map<string, Judgement>();
+  // ③ AI 판단 (파일 내용이 같은 그림은 한 번만, 3개씩) — 결과는 같은 내용의 모든 주소에 나눠 준다
+  const plan = planJudging(results);
+  const srcs = plan.representatives;
+  const judged = new Map<string, Judgement>();
   const reportJudge = () =>
     onProgress({
       step: 'AI 판단',
-      done: judgements.size,
+      done: judged.size,
       total: srcs.length,
-      problems: [...judgements.values()].filter((j) => j.verdict === '확인 필요').length,
+      problems: [...judged.values()].filter((j) => j.verdict === '확인 필요').length,
     });
   reportJudge();
   let next = 0;
   const worker = async () => {
     while (next < srcs.length) {
       const src = srcs[next++];
-      judgements.set(src, await judgeOne(src, config));
+      judged.set(src, await judgeOne(src, config));
       reportJudge();
     }
   };
   await Promise.all(Array.from({ length: JUDGE_CONCURRENCY }, worker));
+  const judgements = spreadJudgements(plan, judged);
 
   // ④ 시트 1 행
   const records = buildRecords(results, judgements, targets.homeMenus);

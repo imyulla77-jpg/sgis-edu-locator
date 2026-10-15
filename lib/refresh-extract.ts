@@ -122,6 +122,7 @@ async function readInPage(args: { maxYear: number; maxSide: number }): Promise<R
         section,
         indexInSection: k + 1,
         capture: await drawImage(uniqueImgs[k]),
+        sha256: null, // 지문은 페이지 밖에서 서버가 그림을 받아 붙인다(refresh-collect.ts)
         button,
         buttonNote,
       });

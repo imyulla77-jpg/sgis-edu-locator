@@ -1,4 +1,4 @@
-// 주소 검사 — 화면과 서버가 함께 쓴다 (PRD must 1, DESIGN.md 7·10장)
+// 주소 검사 — 화면과 서버가 함께 쓴다 (PRD must 1, DESIGN.md 7·11장)
 
 /** 수집을 허용하는 주소의 시작 부분 */
 export const ALLOWED_PREFIX = 'https://sgis.mods.go.kr/';
@@ -29,7 +29,7 @@ export const PAGE_PATH_ERROR_MESSAGE = 'SGIS에듀 화면(/view/edu/…)만 수�
 
 /**
  * 수집해도 되는 페이지 주소인지 확인한다(sgis 주소이면서 에듀 화면 경로).
- * 서버 API를 직접 불러 로그인 화면 등 에듀 밖의 페이지를 열게 하지 못하도록 쓴다(CHECK.md SEC-009).
+ * 서버 API를 직접 불러 로그인 화면 등 에듀 밖의 페이지를 열게 하지 못하도록 쓴다(CHECK.md SEC-001·SEC-007).
  */
 export function isCollectablePage(input: string): boolean {
   return isAllowedUrl(input) && COLLECT_PATH.test(new URL(input.trim()).pathname);

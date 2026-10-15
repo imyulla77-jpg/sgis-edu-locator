@@ -2,7 +2,7 @@
 // (DESIGN.md 12·13장, PLAN 작업 13·14)
 // 실행: npm run refresh:dev            (기본 시작 주소)
 //       npm run refresh:dev -- <주소>   (다른 시작 주소)
-// AI 판단에 Claude API를 쓰므로 요금이 생긴다(한 번에 약 1~4달러). 키는 .env의 ANTHROPIC_API_KEY.
+// AI 판단에 Claude API를 쓰므로 요금이 생긴다(한 번에 약 1~2달러, 실측 1.16~1.3달러). 키는 .env의 ANTHROPIC_API_KEY.
 // 결과에서 시트 1 행 20개를 무작위로 골라 대조표(sample.md)와 캡처 그림을 함께 저장한다(CLAUDE.md 8장).
 //
 // Node가 TypeScript 파일을 바로 실행하므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
@@ -11,11 +11,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { JudgeBusyError, JUDGE_MODEL, judgeImage } from '../lib/ai-judge.ts';
 import { excelFileName } from '../lib/download.ts';
 import { buildWorkbook } from '../lib/excel.ts';
+import { planJudging, spreadJudgements } from '../lib/judge-plan.ts';
 import { buildRecords, fileNameOf } from '../lib/records.ts';
 import { collectPages, MAX_PAGES_PER_REQUEST } from '../lib/refresh-collect.ts';
 import type { Judgement, PageResult } from '../lib/refresh-types.ts';
 import { JUDGE_SLOTS } from '../lib/server-limit.ts';
-import { isSiteUnavailable, SITE_UNAVAILABLE_MESSAGE } from '../lib/site-check.ts';
+import { FIRST_PAGES_TO_CHECK, isSiteUnavailable, SITE_UNAVAILABLE_MESSAGE } from '../lib/site-check.ts';
 import { loadTargets } from '../lib/targets.ts';
 import { DEFAULT_START_URL } from '../lib/url.ts';
 
@@ -81,11 +82,13 @@ async function main(): Promise<void> {
   console.log(`대상 찾기 완료: ${targets.pages.length}페이지 · 홈페이지 메뉴 ${targets.homeMenus.length}개 · ${seconds(Date.now() - t0)}`);
   for (const w of targets.warnings) console.log(`  경고: ${w}`);
 
-  // ② 수집 (화면과 같이 4페이지씩, 처음 3개 연속 실패면 멈춤)
+  // ② 수집 (화면과 같이 첫 요청 3페이지, 그 뒤 4페이지씩, 처음 3개 연속 실패면 멈춤)
   const t1 = Date.now();
   const results: PageResult[] = [];
-  for (let i = 0; i < targets.pages.length; i += MAX_PAGES_PER_REQUEST) {
-    results.push(...(await collectPages(targets.pages.slice(i, i + MAX_PAGES_PER_REQUEST))));
+  for (let i = 0; i < targets.pages.length; ) {
+    const size = i === 0 ? FIRST_PAGES_TO_CHECK : MAX_PAGES_PER_REQUEST;
+    results.push(...(await collectPages(targets.pages.slice(i, i + size))));
+    i += size;
     const failed = results.filter((r) => r.status !== '성공').length;
     console.log(`  수집 [${results.length}/${targets.pages.length}] 실패 ${failed}`);
     if (isSiteUnavailable(results)) {
@@ -95,12 +98,14 @@ async function main(): Promise<void> {
   }
   const collectMs = Date.now() - t1;
 
-  // ③ AI 판단 (같은 주소는 한 번만)
+  // ③ AI 판단 (파일 내용이 같은 그림은 한 번만 — lib/judge-plan.ts)
   const t2 = Date.now();
-  const srcs = [...new Set(results.flatMap((r) => r.images.map((i) => i.src)))];
-  const judgements = await judgeAll(srcs, (done) => {
+  const plan = planJudging(results);
+  const srcs = plan.representatives;
+  const judged = await judgeAll(srcs, (done) => {
     if (done % 20 === 0 || done === srcs.length) console.log(`  AI 판단 [${done}/${srcs.length}]`);
   });
+  const judgements = spreadJudgements(plan, judged);
   const judgeMs = Date.now() - t2;
 
   // ④ 시트 1 행
@@ -119,7 +124,7 @@ async function main(): Promise<void> {
     model: JUDGE_MODEL,
     seconds: { total: Math.round(totalMs / 1000), collect: Math.round(collectMs / 1000), judge: Math.round(judgeMs / 1000) },
     pages: { total: results.length, failed: results.filter((r) => r.status !== '성공').length },
-    images: { found: results.reduce((s, r) => s + r.images.length, 0), unique: srcs.length, uniqueFiles: new Set(js.map((j) => j.sha256).filter(Boolean)).size },
+    images: { found: results.reduce((s, r) => s + r.images.length, 0), uniqueSrcs: judgements.size, sentToAi: srcs.length },
     verdicts: { 현행화대상: countVerdict('현행화 대상'), 대상아님: countVerdict('대상 아님'), 연도없음: countVerdict('연도 없음'), 확인필요: countVerdict('확인 필요') },
     fallbackModels: [...new Set(js.map((j) => j.model).filter((m) => m && m !== JUDGE_MODEL))],
     sentencesFound: results.reduce((s, r) => s + r.sentences.length, 0),

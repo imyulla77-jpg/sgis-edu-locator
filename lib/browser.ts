@@ -1,8 +1,8 @@
-// [서버 전용] 브라우저 띄우기 (DESIGN.md 7장 "브라우저 띄우기", PLAN 작업 4)
+// [서버 전용] 브라우저 띄우기·닫기 (DESIGN.md 1·11장 — 대상 찾기·수집 API가 함께 씀)
 // 담당자 PC에 설치된 Edge를 쓰고, 없으면 Chrome을 쓴다.
 // Vercel에는 Edge·Chrome이 없어서 서버용 크롬(@sparticuz/chromium)을 쓴다(Part 5, launchBrowser).
 //
-// scripts/collect-dev.ts에서도 불러올 수 있도록 다른 lib 파일을 불러오지 않는다(CLAUDE.md 5장).
+// scripts/run-dev.ts에서도 불러올 수 있도록 다른 lib 파일을 불러오지 않는다(CLAUDE.md 5장).
 
 import { chromium, type Browser, type Page, type Response } from 'playwright-core';
 
@@ -16,7 +16,7 @@ export const PAGE_TIMEOUT_MS = 60_000;
  */
 export const SETTLE_MAX_MS = 5_000;
 
-/** PC에 쓸 수 있는 브라우저가 없을 때 보여 줄 안내 (DESIGN.md 9장) */
+/** PC에 쓸 수 있는 브라우저가 없을 때 보여 줄 안내 (API가 500과 함께 돌려줌, DESIGN.md 7장) */
 export const NO_BROWSER_MESSAGE = 'PC에 Edge나 Chrome이 필요해요';
 
 /** 시도할 브라우저 순서: Edge → Chrome */

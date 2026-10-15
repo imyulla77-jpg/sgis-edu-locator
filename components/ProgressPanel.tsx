@@ -7,7 +7,7 @@ import type { RunProgress, RunStep } from '@/lib/run-steps';
 const STEPS: { step: RunStep; help: string }[] = [
   { step: '대상 찾기', help: '메뉴를 읽어 검색할 상세 페이지 목록을 만들어요 (약 1분)' },
   { step: '페이지 수집', help: '상세 페이지를 1초 간격으로 하나씩 열어 그림·문장을 모아요 (약 5분)' },
-  { step: 'AI 판단', help: '그림마다 AI가 그림 속 최고 연도를 읽어요 (약 3~5분)' },
+  { step: 'AI 판단', help: 'AI가 그림 속 최고 연도를 읽어요. 내용이 같은 그림은 한 번만 읽어요 (약 2~3분)' },
 ];
 
 export default function ProgressPanel({ progress }: { progress: RunProgress }) {

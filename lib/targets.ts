@@ -45,6 +45,9 @@ const REQUEST_GAP_MS = 1_000;
 /** 페이지·목록 데이터를 다시 시도하는 횟수 (페이지 수집과 같은 규칙: 최대 2번) */
 const MAX_RETRIES = 2;
 
+/** 메뉴를 읽으면 안 되는 화면 주소(로그인·회원·게시판). 페이지가 이런 곳으로 넘어가면 멈춘다 */
+const NOT_MENU_PAGE = /(login|logout|authorization|member|board)/i;
+
 /** 목록 데이터를 몇 쪽까지 넘겨 보는지 (끝없이 넘기지 않게) */
 const MAX_LIST_PAGES = 20;
 
@@ -308,7 +311,10 @@ export async function loadTargets(startUrl: string, options: TargetsOptions = {}
       return retry(url, async (waitMs) => {
         await openPage(page, url, waitMs);
         // 사이트가 다른 주소로 넘겨줬으면 그 화면을 읽지 않는다(CHECK.md SEC-001)
-        if (!isAllowedUrl(page.url())) throw new TargetsError('사이트가 sgis.mods.go.kr 밖의 주소로 넘어가서 메뉴를 읽지 않았어요');
+        // 같은 sgis 안이라도 로그인·회원·게시판 화면으로 넘어갔으면 읽지 않는다(분석 G-11)
+        if (!isAllowedUrl(page.url()) || NOT_MENU_PAGE.test(new URL(page.url()).pathname)) {
+          throw new TargetsError('사이트가 메뉴가 없는 다른 화면(sgis 밖·로그인·게시판 등)으로 넘어가서 메뉴를 읽지 않았어요');
+        }
         const until = Date.now() + Math.min(10_000, timeLeft());
         let value = await read(page);
         while (!isReady(value) && Date.now() < until) {

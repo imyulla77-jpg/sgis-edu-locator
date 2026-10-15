@@ -1,7 +1,7 @@
 // POST /api/refresh-collect — 상세 페이지 몇 개(최대 4개)를 수집해 돌려준다 (DESIGN.md 7장, PLAN 작업 7)
 // 입력: { pages: PageTarget[] }   출력: { results: PageResult[] }   오류: { error } (화면에 그대로 보여 줘도 되는 문장)
 // 시간 한도(100초)를 넘기면 남은 페이지는 "시간 초과"로 돌려준다(refresh-collect.ts).
-// 1판 화면이 쓰는 /api/collect는 화면을 2판으로 바꿀 때까지 그대로 둔다.
+// 1판의 /api/collect는 2026-10-15 화면 교체 때 trash-can으로 옮겼다.
 
 import { BrowserNotFoundError } from '@/lib/browser';
 import { collectPages, isDetailPage, MAX_PAGES_PER_REQUEST } from '@/lib/refresh-collect';
