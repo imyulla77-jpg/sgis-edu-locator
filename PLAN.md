@@ -103,3 +103,7 @@ PRD의 must 2개(현행화 대상 그림·문장 찾기 / 정렬·병합 엑셀 
 - 2026-10-15 Design 완료: 작업 1~4 결과와 작업 5(타입 설계)는 [DESIGN.md](DESIGN.md), 점검 목록은 [CHECK.md](CHECK.md). 결정: Claude Opus 5.5, `@anthropic-ai/sdk` 설치, 실행 비밀번호.
 - 2026-10-15 Do 완료: DESIGN.md 13장 1~8번을 모두 구현하고 PC·배포본에서 처음부터 끝까지 확인했다(CHECK.md).
 - 다음은 Check 단계: 설계(DESIGN.md)와 실제 코드가 맞는지 차이 분석(gap analysis)을 하고, 남은 항목(CHECK.md의 부분 완료 FN-008, nice 1~3)을 정리한다.
+
+## Check 단계 (2026-10-15)
+
+- gap-detector 분석 결과 일치율 약 90%: [docs/03-analysis/sgis-edu-refresh.analysis.md](docs/03-analysis/sgis-edu-refresh.analysis.md)

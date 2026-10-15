@@ -29,13 +29,13 @@
 
 | ID | 점검 내용 | 근거 | 상태 |
 |---|---|---|---|
-| SEC-001 | 모든 API가 받은 주소를 `isAllowedUrl`로 다시 검사 | CLAUDE.md 9장 | 미완료 |
-| SEC-002 | 브라우저 API는 `tryAcquire` 1개, AI API는 3개까지(넘으면 429) | DESIGN 7장 | 미완료 |
-| SEC-003 | 다른 사이트에서 온 요청은 403 (`crossSiteResponse`) | DESIGN 7장 | 미완료 |
+| SEC-001 | 모든 API가 받은 주소를 `isAllowedUrl`로 다시 검사 | CLAUDE.md 9장 | 완료 (targets·refresh-collect·judge route에서 재검사 — 분석 2026-10-15) |
+| SEC-002 | 브라우저 API는 `tryAcquire` 1개, AI API는 3개까지(넘으면 429) | DESIGN 7장 | 완료 (BROWSER_SLOTS 1·JUDGE_SLOTS 3 — 분석 2026-10-15) |
+| SEC-003 | 다른 사이트에서 온 요청은 403 (`crossSiteResponse`) | DESIGN 7장 | 완료 (세 API 첫 줄 crossSiteResponse — 분석 2026-10-15) |
 | SEC-004 | `RUN_PASSWORD`가 있으면 비밀번호 없거나 틀린 요청은 401, 비교는 `timingSafeEqual` | DESIGN 7장 | 완료 (/api/targets·/api/refresh-collect·/api/judge) |
 | SEC-005 | `ANTHROPIC_API_KEY`·`RUN_PASSWORD`가 화면 쪽 빌드 파일·로그·엑셀·오류 메시지에 없음 | DESIGN 11장 | 완료 (화면 쪽 빌드 파일에 이름 0건, 서버 기록은 오류 이름·주소·시간만, 엑셀에 없음) |
 | SEC-006 | `/api/judge`는 SGIS에듀 콘텐츠 그림 주소(`/sgis_edu/resource/images/contents/`)만 받음 | DESIGN 11장 | 완료 |
-| SEC-007 | 게시판·로그인·이용자 등록 콘텐츠를 열거나 수집하지 않음 | PRD 6장 | 미완료 |
+| SEC-007 | 게시판·로그인·이용자 등록 콘텐츠를 열거나 수집하지 않음 | PRD 6장 | 완료 (상세 페이지·스스로하기 주소만 열고 /upload/ 제외. 넘어간 주소 검사는 G-11로 보강 예정) |
 | SEC-008 | `.env`가 Vercel 업로드에 포함되지 않음(`.vercelignore`) | DESIGN 11장 (커밋 c2a2094) | 완료 |
 
 ## 검증 (VER)
@@ -46,5 +46,5 @@
 | VER-002 | 무작위 그림 20개의 AI 판정이 사람이 읽은 최고 연도 판정과 일치 | PLAN SC-2, 20/20 | 완료 (무작위 그림 20개 모두 AI가 연도를 맞게 읽음 — 표본 7 + 추가 13, 2026-10-15) |
 | VER-003 | 같은 20개 행의 에듀 위치·홈페이지 경로가 실제와 일치 | PLAN SC-3, 20/20 | 완료 (위치 20/20, 경로 고친 뒤 20/20, 2026-10-15) |
 | VER-004 | 전체 25분 이내, 엑셀 50MB 이하, AI 요금 5달러 이하 | PLAN SC-5, DESIGN 10장 | 완료 (화면에서 검색 시작→엑셀 약 7분 45초, 엑셀 3.4MB, AI 약 1.3달러, 2026-10-15) |
-| VER-005 | `npm run lint`·`npm run build` 오류 0개 | PLAN SC-6 | 미완료 |
+| VER-005 | `npm run lint`·`npm run build` 오류 0개 | PLAN SC-6 | 완료 (2026-10-15 다시 실행, 오류 0) |
 | VER-006 | 배포본에서 비밀번호 넣고 처음부터 끝까지 동작 | PRD 7장 | 완료 (배포본 전체 실행 7분·실패 0·엑셀 3.2MB, 비밀번호 없으면 401, 2026-10-15) |
