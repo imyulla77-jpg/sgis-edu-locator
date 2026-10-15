@@ -51,7 +51,10 @@
 - 버튼 문구에서 **메뉴**(통계주제도·대화형 통계지도·활용서비스·분석지도)와 **하위 이름**(괄호 안)을, `onclick`에서 **주소**를 읽는다. 문구의 `｢ ｣`, "대화형통계지도"처럼 띄어쓰기가 다른 표기는 정리해서 맞춘다.
 - SGIS 홈페이지 메인(`https://sgis.mods.go.kr/`)의 상단 메뉴를 매번 읽어, 바로가기 주소가 4개 메뉴 중 어디 아래인지 **주소로** 확인한다. 상단 메뉴(`#gnb > ul > li`)에는 1단계 이름만 있고, 하위 메뉴는 같은 순서로 놓인 사이트맵(`.headerDiv .subMenu .inner > div > ul`)에 있다(2026-10-15 기준 4개 메뉴 하위 32개). 두 목록 개수가 다르면 경고하고 버튼 문구로만 정한다.
 - 바로가기 주소 중 메뉴 목록과 똑같지 않은 것이 있다(예: `/jsp/pyramid/pyramid2.jsp` ↔ 메뉴 `/jsp/pyramid/pyramid1.jsp`, `/publicsmodel/newAging.vw` ↔ `/publicsmodel/`). 그래서 맞추는 순서는 ① 주소(물음표 앞) 똑같음 → ② 같은 폴더(마지막 `/` 앞) → ③ 버튼 문구(비고 "버튼 문구 기준")로 한다(구현 3에서 적용). 주소가 메뉴 목록에 없으면 버튼 문구로 정하고 비고에 "버튼 문구 기준"이라 적는다. 4개 메뉴가 아니면 "홈페이지 경로 없음".
-- 그림과 버튼 짝짓기: 같은 소제목 영역 안의 버튼. 영역에 버튼이 없으면 콘텐츠 전체에 버튼이 1개일 때만 그 버튼을 쓰고, 2개 이상이면 "홈페이지 경로 없음(버튼 위치 불분명)".
+- 소제목 영역 = 슬라이드(`.slideObj`, 넘겨 보는 화면 하나, 복제본 `.slick-cloned` 제외). 수업 상세·스스로하기 모두 이 구조다. 영역 이름은 "N번 화면: 소제목(최대 40자)".
+- 그림과 버튼 짝짓기: **같은 슬라이드 안의 버튼만** 쓴다(버튼 1개 → 그 버튼, 그림 수와 버튼 수가 같으면 순서대로, 그 밖에는 "짝을 정할 수 없음"). 버튼이 없는 슬라이드의 그림은 "바로가기 버튼 없음" → 홈페이지 경로 없음.
+  - 2026-10-15 바꿈: 처음엔 "콘텐츠 전체에 버튼이 1개면 모든 그림에 그 버튼"이었으나, 바로가기 버튼은 'SGIS에서 해 보기' 슬라이드(`contents/sgis/` 캡처 그림)에만 있고 본문 슬라이드의 그래프는 다른 화면이라 틀린 경로가 적히게 되어 바꿨다.
+- 서버는 버튼(문구·주소)만 돌려주고, 홈페이지 경로는 `lib/home-link.ts`의 `resolveHomeLink`가 정한다(브라우저 없이 계산 → 화면에서 시트 만들 때 사용).
 
 ## 3. 결정 사항 (담당자 결정 2026-10-15)
 
@@ -85,7 +88,8 @@
 ## 5. 주변 문장 설계
 
 - 상세 페이지를 열 때(수집 단계) **그림이 있는 소제목 영역마다** 문장을 나눠(마침표·줄바꿈 기준) **1900~2026 사이 4자리 연도가 들어간 문장**만 고른다. 그림 판정 전이라 우선 모두 모아 두고, 화면이 판정 후 **현행화 대상 그림이 있는 영역의 문장만** 시트 1에 남긴다.
-- 그 문장이 들어 있는 화면 요소(문단·목록 한 줄)를 서버 브라우저에서 캡처한다(긴 변 최대 600픽셀 JPEG). 숨은 단계 탭(스스로하기) 등으로 캡처가 안 되면 "캡처 불가(숨김)".
+- 그 문장이 들어 있는 화면 요소(문단·목록 한 줄)를 서버 브라우저에서 캡처한다(너비 800픽셀 JPEG). 넘겨지지 않은 슬라이드는 화면에 안 보이므로, 그 요소를 부모 두 단계 모양과 함께 화면 맨 위에 복사해 찍는다. 페이지당 최대 40장, 못 찍으면 "캡처 불가".
+- 그림 캡처는 페이지 안에서 그림을 캔버스에 줄여 그려 만든다(긴 변 최대 400픽셀 JPEG) — 슬라이드가 안 보여도 되고, 그림 줄이기 패키지가 필요 없다.
 - 같은 영역에 그림이 여러 개면 "관련 그림" 칸에 그 영역 그림 번호를 모두 적는다.
 - "2010년 이후"처럼 기간을 나타내는 연도도 찾되, 고칠지는 담당자가 정한다(수정 후 빈칸).
 
@@ -101,7 +105,8 @@ interface MenuLocation { course: Course; level2: '수업하기' | '스스로하�
 interface PageTarget { contentsId: string | null; openUrl: string; title?: string; locations: MenuLocation[] }
 
 interface HomeLink { menu: '통계주제도' | '대화형 통계지도' | '활용서비스' | '분석지도' | null; sub: string; url: string; note?: string }
-interface FoundImage { src: string; section: string; indexInSection: number; capture: string | null /* JPEG base64 */; homeLink: HomeLink | null; homeLinkNote?: string }
+interface DirectButton { text: string; url: string }
+interface FoundImage { src: string; section: string; indexInSection: number; capture: string | null /* JPEG base64 */; button: DirectButton | null; buttonNote?: string }
 interface YearSentence { section: string; text: string; capture: string | null /* JPEG base64 */; relatedImageSrcs: string[] }
 interface PageResult { target: PageTarget; status: '성공' | '수집 실패' | '시간 초과'; error?: string; images: FoundImage[]; sentences: YearSentence[]; seconds: number }
 
@@ -115,7 +120,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 | API | 받는 것 | 돌려주는 것 | 시간 한도 | 동시 실행 |
 |---|---|---|---|---|
 | `POST /api/targets` | `{ startUrl }` | `TargetList { pages: PageTarget[], homeMenus: HomeMenuItem[], warnings }` (시작·메인 3개·홈페이지 메인 열기, 목록 JSON 읽기 — 모두 1초 간격. 실측 약 48초) | 120초(안에서 100초 한도) | 브라우저 1 |
-| `POST /api/collect` | `{ pages: PageTarget[] }` (최대 6개) | `{ results: PageResult[] }` | 120초(안에서 100초 넘으면 남은 것은 "시간 초과") | 브라우저 1 |
+| `POST /api/refresh-collect` | `{ pages: PageTarget[] }` (최대 4개 — 캡처가 들어 있어 응답이 Vercel 한도 4.5MB를 넘지 않게) | `{ results: PageResult[] }` | 120초(안에서 100초 넘으면 남은 것은 "시간 초과") | 브라우저 1 |
 | `POST /api/judge` | `{ src }` (`/sgis_edu/resource/images/contents/` 그림만) | `Judgement` | 60초 | AI 3 |
 
 | 상태 코드 | 뜻 | 화면 처리 |
@@ -180,7 +185,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 | 항목 | 추정 | 목표 |
 |---|---|---|
 | 대상 찾기 | 약 30초 | — |
-| 페이지 수집 40개 | 약 3분 | — |
+| 페이지 수집 40개 | 약 3분 → **실측 약 4분 40초**(캡처 포함, 2026-10-15) | — |
 | AI 판단 약 200개(3개씩) | 약 10~15분 | — |
 | 엑셀 만들기 | 약 30초 | — |
 | **전체** | **약 15~20분** | **25분 이내** |
@@ -200,7 +205,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 app/
   page.tsx                 시작·진행·결과 화면 (고쳐 씀)
   api/targets/route.ts     (새) 대상 페이지 목록       ← api/menus 대체
-  api/collect/route.ts     (고쳐 씀) 상세 페이지 수집
+  api/refresh-collect/route.ts (새) 상세 페이지 수집   ← 화면 교체 때 1판 api/collect는 trash-can으로
   api/judge/route.ts       (새) AI 연도 판단
 components/
   StartForm.tsx            (고쳐 씀) 주소·비밀번호·검색 시작
@@ -211,8 +216,8 @@ lib/
   url.ts, site-check.ts, server-limit.ts, browser.ts   (살려 씀)
   run-password.ts          (새) 실행 비밀번호 검사
   targets.ts               (새) 메뉴 읽기·목록 JSON·홈페이지 메뉴     ← menus.ts 대체
-  collect.ts               (고쳐 씀) 페이지 열기·재시도·시간 한도
-  extract.ts               (새로 씀) 그림·소제목·바로가기·연도 문장·캡처
+  refresh-collect.ts       (새) 페이지 열기·재시도·시간 한도   ← 1판 collect.ts 대체
+  refresh-extract.ts       (새) 그림·소제목·바로가기·연도 문장·캡처   ← 1판 extract.ts 대체
   home-link.ts             (새) 바로가기 → 홈페이지 경로
   ai-judge.ts              (새) Claude 호출·판정
   run-steps.ts             (고쳐 씀, ← run-batches.ts) 화면의 진행 지휘
@@ -224,13 +229,13 @@ scripts/
   check-sample.ts          (고쳐 씀) 무작위 20개 대조표 만들기
 ```
 
-`trash-can/`으로 옮길 것(**화면을 2판으로 바꾸는 6번 작업 때 한꺼번에** — 그 전에 옮기면 1판 화면이 빌드되지 않아 배포본이 멈춘다): `lib/types.ts`, `app/api/image`, `app/api/menus`, `lib/menus.ts`, `lib/menu-select.ts`, `lib/search.ts`, `lib/compare.ts`, `lib/past-result.ts`, `lib/thumbnail.ts`, `lib/collect-client.ts`(→ run-steps로 합침), `components/MenuPicker.tsx`, `components/PastCompare.tsx`, `components/ResultSearch.tsx`.
+`trash-can/`으로 옮길 것(**화면을 2판으로 바꾸는 6번 작업 때 한꺼번에** — 그 전에 옮기면 1판 화면이 빌드되지 않아 배포본이 멈춘다): `lib/types.ts`, `lib/collect.ts`, `lib/extract.ts`, `app/api/collect`, `app/api/image`, `app/api/menus`, `lib/menus.ts`, `lib/menu-select.ts`, `lib/search.ts`, `lib/compare.ts`, `lib/past-result.ts`, `lib/thumbnail.ts`, `lib/collect-client.ts`(→ run-steps로 합침), `components/MenuPicker.tsx`, `components/PastCompare.tsx`, `components/ResultSearch.tsx`.
 
 ## 13. 구현 순서 (PLAN 작업 6~22와 연결)
 
 1. `@anthropic-ai/sdk` 설치(0.134.0), `lib/refresh-types.ts` 만들기 (PLAN 5) — **2026-10-15 완료**
 2. `lib/targets.ts` + `/api/targets` + `lib/run-password.ts` (PLAN 6) — **2026-10-15 완료** (실제 사이트: 대상 40개, 위치 154곳, 경고 0, 약 48초)
-3. `lib/collect.ts`·`lib/extract.ts`·`lib/home-link.ts` + `/api/collect` (PLAN 7·8·11·12)
+3. `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts` + `/api/refresh-collect` (PLAN 7·8·11·12) — 1판 화면이 쓰는 파일과 이름이 겹치지 않게 `refresh-`를 붙임 — **2026-10-15 완료** (실제 40개: 실패 0, 그림 198개·캡처 실패 0, 바로가기 짝 42개, 연도 문장 204개·캡처 실패 0, 요청당 응답 최대 약 0.7MB)
 4. `lib/ai-judge.ts` + `/api/judge` (PLAN 9·10)
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
 6. 화면 3개, 1판 파일 `trash-can/`으로 (PLAN 15~17)
@@ -244,3 +249,4 @@ scripts/
 | 2026-10-15 | 2판 처음 작성 (요구사항 문서 기준, 사이트 조사 결과·담당자 결정 반영) |
 | 2026-10-15 | 구현 1: SDK 설치, 타입을 `lib/refresh-types.ts`로(1판 화면 유지 위해), 그림 캡처를 AI 판단이 아닌 수집 때 서버 브라우저가 찍도록 바꿈(그림 줄이기 패키지가 필요 없게), 1판 파일 정리는 화면 교체 작업으로 미룸 |
 | 2026-10-15 | 구현 2: `lib/targets.ts`·`/api/targets`·`lib/run-password.ts` 추가. 표 이름 맞추기에 조사 "의" 무시 단계 추가, 홈페이지 하위 메뉴는 사이트맵에서 읽음, 바로가기 주소 맞추는 순서(주소→폴더→문구) 정함, `/api/targets` 시간 한도 120초로 늘림(실측 48초) |
+| 2026-10-15 | 구현 3: `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts`·`/api/refresh-collect` 추가. 소제목 영역 = 슬라이드, 바로가기는 같은 슬라이드 그림과만 짝(콘텐츠 전체 1개 규칙 폐기), 서버는 버튼만 돌려주고 홈페이지 경로는 화면에서 계산, 그림 캡처는 페이지 안 캔버스로, 문장 캡처는 복사본을 맨 위에 띄워 찍음(slick 이름표 제거), 요청당 최대 4페이지, 스스로하기 제목은 3단계 메뉴 이름 |

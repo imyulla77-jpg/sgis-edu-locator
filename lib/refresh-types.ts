@@ -65,26 +65,34 @@ export interface HomeLink {
   note?: string;
 }
 
+/** 상세 페이지의 "SGIS ○○ 바로가기" 버튼 하나 */
+export interface DirectButton {
+  /** 버튼 문구. 예: SGIS 분석지도(지방의 변화보기) 바로가기 */
+  text: string;
+  /** 버튼이 여는 주소 (전체 주소) */
+  url: string;
+}
+
 /** 상세 페이지에서 찾은 본문 그림 하나 */
 export interface FoundImage {
   src: string;
-  /** 그림이 속한 소제목 */
+  /** 그림이 속한 소제목 영역(슬라이드). 예: "1번 화면: 우리나라의 인구변화" */
   section: string;
-  /** 소제목 안에서 몇 번째 그림인지 (1부터) */
+  /** 소제목 영역 안에서 몇 번째 그림인지 (1부터) */
   indexInSection: number;
-  /** 그림 부분 화면 캡처 (JPEG base64, 엑셀 "캡처" 칸). 숨어 있어 못 찍으면 null */
+  /** 그림 캡처 (JPEG base64, 긴 변 최대 400픽셀, 엑셀 "캡처" 칸). 그리지 못하면 null */
   capture: string | null;
-  /** 바로가기가 없거나 짝을 정할 수 없으면 null */
-  homeLink: HomeLink | null;
-  /** homeLink가 null인 이유 */
-  homeLinkNote?: string;
+  /** 같은 소제목 영역의 바로가기 버튼. 없거나 짝을 정할 수 없으면 null (홈페이지 경로는 화면이 home-link.ts로 정함) */
+  button: DirectButton | null;
+  /** button이 null인 이유 */
+  buttonNote?: string;
 }
 
 /** 그림이 있는 소제목 영역에서 찾은, 2026년 이하 연도가 들어간 문장 하나 */
 export interface YearSentence {
   section: string;
   text: string;
-  /** 문장 부분 화면 캡처 (JPEG base64). 숨어 있어 못 찍으면 null → "캡처 불가(숨김)" */
+  /** 문장이 들어 있는 화면 요소(문단·목록 한 줄) 캡처 (JPEG base64). 못 찍으면 null → "캡처 불가" */
   capture: string | null;
   /** 같은 영역의 그림 주소 */
   relatedImageSrcs: string[];

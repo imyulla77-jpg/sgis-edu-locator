@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/menus": BROWSER_FILES,
     "/api/targets": BROWSER_FILES,
+    "/api/refresh-collect": BROWSER_FILES,
     "/api/collect": BROWSER_FILES,
   },
 };
