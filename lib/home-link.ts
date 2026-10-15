@@ -20,6 +20,15 @@ function pathOf(url: string): string {
   }
 }
 
+/** 주소의 theme 값 (통계주제도 주제 구분, 예: CTGR_005). 없으면 null */
+function themeOf(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get('theme');
+  } catch {
+    return null;
+  }
+}
+
 /** 경로의 폴더 부분. 예: /jsp/pyramid/pyramid2.jsp → /jsp/pyramid/ */
 function folderOf(path: string): string {
   return path.slice(0, path.lastIndexOf('/') + 1);
@@ -47,16 +56,29 @@ export function parseButtonText(text: string): { menu: HomeMenu | null; sub: str
 export function resolveHomeLink(button: DirectButton, homeMenus: HomeMenuItem[]): HomeLink {
   const path = pathOf(button.url);
   const fromText = parseButtonText(button.text);
+  /** 주소로 찾은 메뉴가 버튼 문구의 메뉴와 다르면(홈페이지 메뉴가 옮겨진 경우 등) 비고에 남긴다 */
+  const withMenuNote = (link: HomeLink): HomeLink =>
+    fromText.menu && link.menu && fromText.menu !== link.menu
+      ? { ...link, note: [link.note, `버튼 문구는 "${fromText.menu}"이지만 현재 홈페이지 메뉴 기준`].filter(Boolean).join(' / ') }
+      : link;
 
-  // ① 주소가 똑같은 홈페이지 메뉴
-  const exact = homeMenus.find((item) => pathOf(item.url) === path);
-  if (path && exact) return { menu: exact.menu, sub: exact.name, url: button.url };
+  // ① 주소(경로)가 똑같은 홈페이지 메뉴. 통계주제도처럼 경로가 같고 뒤의 값(theme=…)만 다른 메뉴가 여러 개면
+  //    theme 값이 같은 것 → 버튼 문구의 하위 이름이 같은 것 순서로 고른다. 그래도 못 고르면 ③ 버튼 문구로 넘어간다
+  const samePath = path ? homeMenus.filter((item) => pathOf(item.url) === path) : [];
+  const exact =
+    samePath.length === 1
+      ? samePath[0]
+      : (samePath.find((item) => themeOf(item.url) !== null && themeOf(item.url) === themeOf(button.url)) ??
+        samePath.find((item) => squash(item.name) === squash(fromText.sub)));
+  if (exact) return withMenuNote({ menu: exact.menu, sub: exact.name, url: button.url });
 
   // ② 같은 폴더의 홈페이지 메뉴 (예: pyramid2.jsp ↔ 메뉴 pyramid1.jsp). 여러 개면 버튼 문구의 이름과 같은 것
-  const sameFolder = path ? homeMenus.filter((item) => folderOf(pathOf(item.url)) === folderOf(path) && folderOf(path) !== '/') : [];
+  //    (경로가 똑같은 메뉴가 여러 개인데 못 고른 경우는 이 단계를 건너뛴다)
+  const sameFolder =
+    path && samePath.length === 0 ? homeMenus.filter((item) => folderOf(pathOf(item.url)) === folderOf(path) && folderOf(path) !== '/') : [];
   if (sameFolder.length > 0) {
     const named = sameFolder.find((item) => squash(item.name) === squash(fromText.sub)) ?? sameFolder[0];
-    return { menu: named.menu, sub: named.name, url: button.url, note: '주소가 홈페이지 메뉴와 조금 달라 같은 폴더의 메뉴로 맞춤' };
+    return withMenuNote({ menu: named.menu, sub: named.name, url: button.url, note: '주소가 홈페이지 메뉴와 조금 달라 같은 폴더의 메뉴로 맞춤' });
   }
 
   // ③ 버튼 문구

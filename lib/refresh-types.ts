@@ -108,6 +108,39 @@ export interface PageResult {
   seconds: number;
 }
 
+/**
+ * 시트 1(현행화_기록)의 행 하나 = (현행화 대상·확인 필요 그림 또는 수정 필요 문장) × (메뉴 위치 1곳) (DESIGN.md 9장)
+ * lib/records.ts가 만들고, 시트 2·3도 이 행으로 만든다.
+ */
+export interface RecordRow {
+  /** 1부터 */
+  no: number;
+  kind: '그림' | '문장';
+  /** JPEG base64 (그림: 그림 캡처, 문장: 문장 캡처). 없으면 null */
+  capture: string | null;
+  location: MenuLocation;
+  pageTitle: string;
+  contentsId: string | null;
+  section: string;
+  /** 그림 행: 영역 안 몇 번째 그림 */
+  imageIndex?: number;
+  /** 그림 행: 그림 주소 */
+  src?: string;
+  /** 그림 행: 파일 지문 (같은 그림 묶기용) */
+  sha256?: string | null;
+  years?: number[];
+  maxYear?: number | null;
+  verdict?: Verdict;
+  /** 그림 행: 홈페이지 경로 (바로가기가 없으면 null) */
+  homeLink?: HomeLink | null;
+  /** 문장 행: 수정 전 내용 */
+  before?: string;
+  /** 문장 행: 같은 영역의 대상·확인 필요 그림 파일 이름 */
+  relatedImages?: string[];
+  /** 확인 필요 이유, 홈페이지 경로 비고 등 */
+  note: string;
+}
+
 /** 그림 하나의 AI 판단 결과 */
 export interface Judgement {
   src: string;
@@ -119,6 +152,8 @@ export interface Judgement {
   verdict: Verdict;
   /** 실제로 답한 모델 이름 (대체 모델이 답했으면 그 이름) */
   model: string | null;
+  /** AI가 쓴 토큰 수 (요금 계산용). AI를 부르지 않았으면 없음 */
+  usage?: { inputTokens: number; outputTokens: number };
   /** 확인 필요 이유 */
   error?: string;
 }

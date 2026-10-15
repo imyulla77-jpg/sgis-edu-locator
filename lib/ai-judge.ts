@@ -70,6 +70,10 @@ export function decideVerdict(reading: YearReading, maxAllowed = TARGET_MAX_YEAR
     return { verdict: '연도 없음' };
   }
   const valid = reading.years.filter((y) => Number.isInteger(y) && y >= 1900 && y <= 2099);
+  // 1900년보다 이른 연도만 있으면(예: 1866년 옛 지도 설명) 역사 자료일 수 있어 사람이 보게 한다
+  if (valid.length === 0 && reading.years.some((y) => Number.isInteger(y) && y >= 1000 && y < 1900)) {
+    return { verdict: '확인 필요', error: `1900년 이전 연도만 있음(${reading.years.join('·')}) — 역사 자료일 수 있음` };
+  }
   if (valid.length === 0 || reading.maxYear === null) return { verdict: '확인 필요', error: 'AI 답이 앞뒤가 맞지 않음(연도 있음인데 연도가 없음)' };
   if (Math.max(...valid) !== reading.maxYear) return { verdict: '확인 필요', error: 'AI 답이 앞뒤가 맞지 않음(최고 연도 불일치)' };
   return { verdict: reading.maxYear <= maxAllowed ? '현행화 대상' : '대상 아님' };
@@ -102,7 +106,10 @@ function getClient(): Anthropic {
 }
 
 /** Claude에 그림을 보내 연도를 읽는다. 거절·형식 오류는 Error로 던진다 */
-async function readYears(bytes: Buffer, mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'): Promise<{ reading: YearReading; model: string }> {
+async function readYears(
+  bytes: Buffer,
+  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp',
+): Promise<{ reading: YearReading; model: string; usage: { inputTokens: number; outputTokens: number } }> {
   const response = await getClient().beta.messages.create({
     model: JUDGE_MODEL,
     max_tokens: 4000,
@@ -129,7 +136,11 @@ async function readYears(bytes: Buffer, mediaType: 'image/png' | 'image/jpeg' | 
     throw new Error('AI 답 형식이 맞지 않음');
   }
   const years = [...new Set(parsed.years.map(Number))].sort((a, b) => a - b);
-  return { reading: { years, maxYear: parsed.maxYear ?? null, status: parsed.status as YearReading['status'] }, model: response.model };
+  return {
+    reading: { years, maxYear: parsed.maxYear ?? null, status: parsed.status as YearReading['status'] },
+    model: response.model,
+    usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+  };
 }
 
 /** AI 요청이 많아 거절됐는지 (화면이 잠시 쉬었다 다시 보내게 429로 알림) */
@@ -159,9 +170,9 @@ export async function judgeImage(src: string): Promise<Judgement> {
   if (!process.env.ANTHROPIC_API_KEY) return { ...base, sha256, error: 'AI 키가 설정되지 않음(ANTHROPIC_API_KEY)' };
 
   try {
-    const { reading, model } = await readYears(image.bytes, image.mediaType);
+    const { reading, model, usage } = await readYears(image.bytes, image.mediaType);
     const { verdict, error } = decideVerdict(reading);
-    return { src, sha256, years: reading.years, maxYear: reading.maxYear, verdict, model, error };
+    return { src, sha256, years: reading.years, maxYear: reading.maxYear, verdict, model, usage, error };
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) throw new JudgeBusyError();
     if (error instanceof Anthropic.AuthenticationError) return { ...base, sha256, error: 'AI 키가 맞지 않음(ANTHROPIC_API_KEY 확인)' };

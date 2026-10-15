@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "collect:dev": "node --no-warnings scripts/collect-dev.ts",
-    "check:sample": "node --no-warnings scripts/check-sample.ts"
+    "check:sample": "node --no-warnings scripts/check-sample.ts",
+    "refresh:dev": "node --no-warnings --env-file-if-exists=.env scripts/run-dev.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.134.0",
