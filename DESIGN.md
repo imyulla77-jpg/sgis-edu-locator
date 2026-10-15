@@ -71,7 +71,9 @@
 ## 4. AI 연도 판단 설계
 
 - **요청 한 번 = 그림 한 장.** 서버가 그림을 받아(10초 제한) base64로 Claude에 보낸다. 같은 지문(파일 내용 sha256)의 그림은 화면이 한 번만 보낸다.
-- 모델 `claude-opus-5-5`, `output_config.effort: "low"`(단순 판독이라 낮은 단계로 시간·요금을 줄임, 20개 대조에서 틀리면 `medium`으로 올림), `max_tokens` 2000.
+- 모델 `claude-opus-5-5`, `output_config.effort: "low"`(단순 판독이라 낮은 단계로 시간·요금을 줄임, 20개 대조에서 틀리면 `medium`으로 올림), `max_tokens` 4000. 구현: `lib/ai-judge.ts`의 `judgeImage`.
+- 구조화 출력은 zod 패키지를 새로 설치하지 않도록 JSON 스키마를 직접 적어 `output_config.format: { type: "json_schema" }`로 보내고, 답 글자를 JSON으로 읽은 뒤 모양을 한 번 더 검사한다.
+- 그림 종류(PNG·JPEG·GIF·WEBP)는 주소가 아니라 파일 첫 부분으로 정한다. 다른 주소로 넘겨주는 응답은 따라가지 않는다.
 - **답 형식은 구조화 출력(`output_config.format`, JSON 스키마)** 으로 고정한다.
 
   ```json
@@ -83,6 +85,8 @@
 - 거절 대비로 SDK의 서버 측 대체 모델 기능(`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`)을 켠다. 대체 모델이 답한 경우 수집_기록 시트에 모델 이름을 함께 적는다.
 - 오류 처리: SDK 기본 재시도(2번) 후에도 실패하면 확인 필요. `RateLimitError`면 화면이 5초 쉬고 1번 더 보낸다.
 - **요금·시간 추정**: 그림 약 200개 × (입력 약 1,500 + 출력·생각 약 500 토큰) ≈ 입력 30만·출력 10만 토큰 → 한 번 검색에 **약 3~4달러**. 화면이 동시에 3개씩 보내면 AI 판단 약 10~15분.
+  - 2026-10-15 실측(그림 8개): 그림 하나에 **2~5초**. 3개씩 보내면 약 200개에 약 3~5분으로 추정이 줄어든다(요금은 전체 실행 때 다시 잰다).
+- **시험 결과(8개)**: 사람이 읽은 연도와 8개 모두 일치. 예) 인구 피라미드 "1960·2023·2072" → 최고 2072라 "대상 아님", SGIS 지도 캡처 "2010·2015·2020" → "현행화 대상", 연도가 없는 그림 3개 → "연도 없음".
 - 키: `ANTHROPIC_API_KEY`(PC는 `.env`, 배포본은 Vercel 환경변수). 서버 코드 `lib/ai-judge.ts`에서만 SDK 기본 생성자(`new Anthropic()`)로 읽는다. 키·요청 내용은 로그에 남기지 않는다.
 
 ## 5. 주변 문장 설계
@@ -121,7 +125,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 |---|---|---|---|---|
 | `POST /api/targets` | `{ startUrl }` | `TargetList { pages: PageTarget[], homeMenus: HomeMenuItem[], warnings }` (시작·메인 3개·홈페이지 메인 열기, 목록 JSON 읽기 — 모두 1초 간격. 실측 약 48초) | 120초(안에서 100초 한도) | 브라우저 1 |
 | `POST /api/refresh-collect` | `{ pages: PageTarget[] }` (최대 4개 — 캡처가 들어 있어 응답이 Vercel 한도 4.5MB를 넘지 않게) | `{ results: PageResult[] }` | 120초(안에서 100초 넘으면 남은 것은 "시간 초과") | 브라우저 1 |
-| `POST /api/judge` | `{ src }` (`/sgis_edu/resource/images/contents/` 그림만) | `Judgement` | 60초 | AI 3 |
+| `POST /api/judge` | `{ src }` (`/sgis_edu/resource/images/contents/…`의 png·jpg·gif·webp만) | `Judgement` (그림 못 받음·AI 오류도 200 + "확인 필요") | 60초 | AI 3 (`JUDGE_SLOTS`) |
 
 | 상태 코드 | 뜻 | 화면 처리 |
 |---|---|---|
@@ -236,7 +240,7 @@ scripts/
 1. `@anthropic-ai/sdk` 설치(0.134.0), `lib/refresh-types.ts` 만들기 (PLAN 5) — **2026-10-15 완료**
 2. `lib/targets.ts` + `/api/targets` + `lib/run-password.ts` (PLAN 6) — **2026-10-15 완료** (실제 사이트: 대상 40개, 위치 154곳, 경고 0, 약 48초)
 3. `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts` + `/api/refresh-collect` (PLAN 7·8·11·12) — 1판 화면이 쓰는 파일과 이름이 겹치지 않게 `refresh-`를 붙임 — **2026-10-15 완료** (실제 40개: 실패 0, 그림 198개·캡처 실패 0, 바로가기 짝 42개, 연도 문장 204개·캡처 실패 0, 요청당 응답 최대 약 0.7MB)
-4. `lib/ai-judge.ts` + `/api/judge` (PLAN 9·10)
+4. `lib/ai-judge.ts` + `/api/judge` (PLAN 9·10) — **2026-10-15 완료** (그림 8개 시험: 8개 모두 사람 판독과 일치, 그림당 2~5초)
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
 6. 화면 3개, 1판 파일 `trash-can/`으로 (PLAN 15~17)
 7. `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` (PLAN 18~21)
@@ -250,3 +254,4 @@ scripts/
 | 2026-10-15 | 구현 1: SDK 설치, 타입을 `lib/refresh-types.ts`로(1판 화면 유지 위해), 그림 캡처를 AI 판단이 아닌 수집 때 서버 브라우저가 찍도록 바꿈(그림 줄이기 패키지가 필요 없게), 1판 파일 정리는 화면 교체 작업으로 미룸 |
 | 2026-10-15 | 구현 2: `lib/targets.ts`·`/api/targets`·`lib/run-password.ts` 추가. 표 이름 맞추기에 조사 "의" 무시 단계 추가, 홈페이지 하위 메뉴는 사이트맵에서 읽음, 바로가기 주소 맞추는 순서(주소→폴더→문구) 정함, `/api/targets` 시간 한도 120초로 늘림(실측 48초) |
 | 2026-10-15 | 구현 3: `lib/refresh-collect.ts`·`lib/refresh-extract.ts`·`lib/home-link.ts`·`/api/refresh-collect` 추가. 소제목 영역 = 슬라이드, 바로가기는 같은 슬라이드 그림과만 짝(콘텐츠 전체 1개 규칙 폐기), 서버는 버튼만 돌려주고 홈페이지 경로는 화면에서 계산, 그림 캡처는 페이지 안 캔버스로, 문장 캡처는 복사본을 맨 위에 띄워 찍음(slick 이름표 제거), 요청당 최대 4페이지, 스스로하기 제목은 3단계 메뉴 이름 |
+| 2026-10-15 | 구현 4: `lib/ai-judge.ts`·`/api/judge` 추가, `lib/server-limit.ts`에 `JUDGE_SLOTS`(3). 구조화 출력은 JSON 스키마 직접 작성(zod 설치 안 함), `max_tokens` 4000, 그림 종류는 파일 첫 부분으로 판별 |

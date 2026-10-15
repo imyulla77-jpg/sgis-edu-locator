@@ -15,9 +15,9 @@
 | FN-004 | 페이지 1초 이상 간격·하나씩, 60초 대기, 2번 재시도, 처음 3개 연속 실패 시 중단 | PRD 6장 | 미완료 |
 | FN-005 | 본문 내용 그림만 수집(`_thumb`·추천 카드·장식·`/upload/` 제외) | DESIGN 2.2 | 완료 |
 | FN-006 | 바로가기 버튼으로 홈페이지 경로(4개 메뉴 > 하위 · 주소)를 정하고, 없으면 "홈페이지 경로 없음" | DESIGN 2.3 | 완료 |
-| FN-007 | AI 답은 구조화 출력으로 받고, 판정(2026 이하/2027 이상/연도 없음/확인 필요)은 코드가 정함 | DESIGN 4장 | 미완료 |
+| FN-007 | AI 답은 구조화 출력으로 받고, 판정(2026 이하/2027 이상/연도 없음/확인 필요)은 코드가 정함 | DESIGN 4장 | 완료 |
 | FN-008 | 같은 그림(sha256 같음)은 AI에 한 번만 보냄 | DESIGN 4장 | 미완료 |
-| FN-009 | AI 오류·거절·그림 못 받음은 "확인 필요"로, 값을 지어내지 않음 | PRD 6장 | 미완료 |
+| FN-009 | AI 오류·거절·그림 못 받음은 "확인 필요"로, 값을 지어내지 않음 | PRD 6장 | 완료 |
 | FN-010 | 현행화 대상 그림 영역의 2026년 이하 연도 문장만 시트 1에 남기고 캡처를 넣음, 수정 후는 빈칸 | DESIGN 5장 | 미완료 |
 | FN-011 | 시트 4개(현행화_기록·현행화_정렬·현행화_병합·수집_기록), 열 구성이 DESIGN 9장과 같음 | DESIGN 9장 | 미완료 |
 | FN-012 | 시트 2·3의 그룹ID가 같고, 시트 3은 그룹 1개당 1행 | PRD must 2 | 미완료 |
@@ -32,9 +32,9 @@
 | SEC-001 | 모든 API가 받은 주소를 `isAllowedUrl`로 다시 검사 | CLAUDE.md 9장 | 미완료 |
 | SEC-002 | 브라우저 API는 `tryAcquire` 1개, AI API는 3개까지(넘으면 429) | DESIGN 7장 | 미완료 |
 | SEC-003 | 다른 사이트에서 온 요청은 403 (`crossSiteResponse`) | DESIGN 7장 | 미완료 |
-| SEC-004 | `RUN_PASSWORD`가 있으면 비밀번호 없거나 틀린 요청은 401, 비교는 `timingSafeEqual` | DESIGN 7장 | 미완료 (/api/targets·/api/refresh-collect 적용, /api/judge는 만들 때) |
+| SEC-004 | `RUN_PASSWORD`가 있으면 비밀번호 없거나 틀린 요청은 401, 비교는 `timingSafeEqual` | DESIGN 7장 | 완료 (/api/targets·/api/refresh-collect·/api/judge) |
 | SEC-005 | `ANTHROPIC_API_KEY`·`RUN_PASSWORD`가 화면 쪽 빌드 파일·로그·엑셀·오류 메시지에 없음 | DESIGN 11장 | 미완료 |
-| SEC-006 | `/api/judge`는 SGIS에듀 콘텐츠 그림 주소(`/sgis_edu/resource/images/contents/`)만 받음 | DESIGN 11장 | 미완료 |
+| SEC-006 | `/api/judge`는 SGIS에듀 콘텐츠 그림 주소(`/sgis_edu/resource/images/contents/`)만 받음 | DESIGN 11장 | 완료 |
 | SEC-007 | 게시판·로그인·이용자 등록 콘텐츠를 열거나 수집하지 않음 | PRD 6장 | 미완료 |
 | SEC-008 | `.env`가 Vercel 업로드에 포함되지 않음(`.vercelignore`) | DESIGN 11장 (커밋 c2a2094) | 완료 |
 
