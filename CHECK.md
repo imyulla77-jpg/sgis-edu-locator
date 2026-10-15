@@ -36,7 +36,7 @@
 | SEC-005 | `ANTHROPIC_API_KEY`·`RUN_PASSWORD`가 화면 쪽 빌드 파일·로그·엑셀·오류 메시지에 없음 | DESIGN 11장 | 미완료 |
 | SEC-006 | `/api/judge`는 SGIS에듀 콘텐츠 그림 주소(`/sgis_edu/resource/images/contents/`)만 받음 | DESIGN 11장 | 미완료 |
 | SEC-007 | 게시판·로그인·이용자 등록 콘텐츠를 열거나 수집하지 않음 | PRD 6장 | 미완료 |
-| SEC-008 | `.env`가 Vercel 업로드에 포함되지 않음(`.vercelignore`) | DESIGN 11장 (세션 `vercel-env`) | 미완료 |
+| SEC-008 | `.env`가 Vercel 업로드에 포함되지 않음(`.vercelignore`) | DESIGN 11장 (커밋 c2a2094) | 완료 |
 
 ## 검증 (VER)
 

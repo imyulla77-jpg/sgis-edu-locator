@@ -13,11 +13,10 @@
  시작 화면(주소·비밀번호) ──POST /api/targets──▶ 메인 3개·홈페이지 메뉴 읽기 ─────────▶ sgis.mods.go.kr
                          ◀── 대상 페이지 목록 ──  + 목록 데이터(JSON) 읽기
  진행률(수집)             ──POST /api/collect──▶ 상세 페이지 열기(1초 간격, 하나씩)
-                         ◀── 그림·소제목·문장·   그림·문장·바로가기 읽기, 연도 문장 캡처
-                             바로가기·문장 캡처
+                         ◀── 그림·소제목·문장·   그림·문장·바로가기 읽기, 그림·연도 문장 캡처
+                             바로가기·캡처
  진행률(AI 판단)          ──POST /api/judge───▶ 그림 받기 → 지문(sha256) → Claude API ─▶ api.anthropic.com
-                         ◀── 최고 연도·판정·      (같은 지문은 한 번만), 작은 그림 만들기
-                             작은 그림
+                         ◀── 최고 연도·판정       (같은 지문은 한 번만)
  결과 요약 → 엑셀 4개 시트 만들기(화면 안, exceljs) → 다운로드
 ```
 
@@ -89,7 +88,9 @@
 - 같은 영역에 그림이 여러 개면 "관련 그림" 칸에 그 영역 그림 번호를 모두 적는다.
 - "2010년 이후"처럼 기간을 나타내는 연도도 찾되, 고칠지는 담당자가 정한다(수정 후 빈칸).
 
-## 6. 데이터 모양 (`lib/types.ts`, PLAN 작업 5)
+## 6. 데이터 모양 (`lib/refresh-types.ts`, PLAN 작업 5)
+
+1판 화면이 화면 교체 전까지 계속 동작하도록 1판 `lib/types.ts`는 그대로 두고, 2판 타입은 새 파일 `lib/refresh-types.ts`에 둔다(실제 코드가 기준, 아래는 요약).
 
 ```ts
 type Course = '초등' | '중학' | '고교';
@@ -99,11 +100,11 @@ interface MenuLocation { course: Course; level2: '수업하기' | '스스로하�
 interface PageTarget { contentsId: string | null; openUrl: string; title?: string; locations: MenuLocation[] }
 
 interface HomeLink { menu: '통계주제도' | '대화형 통계지도' | '활용서비스' | '분석지도' | null; sub: string; url: string; note?: string }
-interface FoundImage { src: string; section: string; indexInSection: number; homeLink: HomeLink | null }
+interface FoundImage { src: string; section: string; indexInSection: number; capture: string | null /* JPEG base64 */; homeLink: HomeLink | null; homeLinkNote?: string }
 interface YearSentence { section: string; text: string; capture: string | null /* JPEG base64 */; relatedImageSrcs: string[] }
 interface PageResult { target: PageTarget; status: '성공' | '수집 실패' | '시간 초과'; error?: string; images: FoundImage[]; sentences: YearSentence[]; seconds: number }
 
-interface Judgement { src: string; sha256: string | null; years: number[]; maxYear: number | null; verdict: Verdict; model: string | null; thumb: string | null /* PNG base64 */; error?: string }
+interface Judgement { src: string; sha256: string | null; years: number[]; maxYear: number | null; verdict: Verdict; model: string | null; error?: string }
 ```
 
 ## 7. 서버 API
@@ -125,7 +126,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 | 429 | 다른 검색 진행 중 / AI 요청 많음 | 5초 쉬고 1번 더, 그래도면 안내 |
 | 500 | 서버 오류(브라우저 없음 등) | 안내문, 해당 페이지·그림은 실패/확인 필요 |
 
-- `app/api/image`(1판 그림 대신 받기)는 `/api/judge`가 작은 그림을 함께 돌려주므로 쓰지 않는다 → `trash-can/`.
+- `app/api/image`(1판 그림 대신 받기)는 그림 캡처를 수집 때 서버 브라우저가 찍으므로(`FoundImage.capture`, 긴 변 최대 400픽셀 JPEG) 쓰지 않는다 → `trash-can/`.
 - **실행 비밀번호**(`lib/run-password.ts`): 서버 환경변수 `RUN_PASSWORD`가 **있을 때만** 검사한다. 화면이 머리말 `x-run-password`로 보내고, 서버는 길이 같은지 + `crypto.timingSafeEqual`로 비교한다. PC(`.env`에 넣지 않음)에서는 검사하지 않고, 배포본(Vercel 환경변수)에서는 필수. 비밀번호는 화면 메모리에만 두고 저장하지 않는다.
 
 ## 8. 화면 흐름
@@ -144,7 +145,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 |---|---|
 | 순번 | 1부터 |
 | 구분 | 그림 / 문장 |
-| 캡처 | 그림: 작은 그림(긴 변 160픽셀), 문장: 문장 캡처 |
+| 캡처 | 그림: 수집 때 찍은 그림 캡처, 문장: 문장 캡처 (엑셀 칸에는 긴 변 160픽셀 크기로 표시) |
 | 과정 · 2단계 · 3단계 | 예: 초등 · 주제보기 · 인구와 고령화 |
 | 상세 페이지 제목 · 페이지 주소 | 메뉴 위치에 맞는 주소(수업하기는 `classDetail`, 주제보기는 `issueDetail`, 해당 과정 경로) |
 | 소제목 · 그림 번호 | 예: 우리나라의 인구변화 · 2번째 그림 |
@@ -190,7 +191,7 @@ interface Judgement { src: string; sha256: string | null; years: number[]; maxYe
 - `ANTHROPIC_API_KEY`, `RUN_PASSWORD`는 서버 코드에서만 읽는다(`NEXT_PUBLIC_` 금지). 빌드 결과물 화면 쪽 파일(`.next/static`)에 두 이름이 없는지 확인한다(PLAN SC-6).
 - `/api/judge`는 SGIS에듀 콘텐츠 그림 주소만 받아, 아무 그림이나 AI에 보내는 데 쓰이지 않게 한다.
 - 결과 엑셀은 내부용. GitHub·인터넷에 올리지 않는다(`*.xlsx`는 `.gitignore`에 있음).
-- `.env`가 Vercel 배포 파일에 섞여 올라가지 않도록 `.vercelignore`를 두는 작업은 별도 작업(세션 `vercel-env`)으로 진행 중이다.
+- `.env`가 Vercel 배포 파일에 섞여 올라가지 않도록 `.vercelignore`로 막았다(커밋 c2a2094).
 
 ## 12. 폴더 구조 (2판 목표)
 
@@ -205,7 +206,7 @@ components/
   ProgressPanel.tsx        (고쳐 씀) 3단계 진행률
   ResultSummary.tsx        (고쳐 씀) 요약·다운로드
 lib/
-  types.ts                 (새로 씀) 6장 타입
+  refresh-types.ts         (새) 6장 타입  ← 화면 교체 때 1판 types.ts는 trash-can으로
   url.ts, site-check.ts, server-limit.ts, browser.ts   (살려 씀)
   run-password.ts          (새) 실행 비밀번호 검사
   targets.ts               (새) 메뉴 읽기·목록 JSON·홈페이지 메뉴     ← menus.ts 대체
@@ -222,16 +223,16 @@ scripts/
   check-sample.ts          (고쳐 씀) 무작위 20개 대조표 만들기
 ```
 
-`trash-can/`으로 옮길 것(해당 작업 때): `app/api/image`, `app/api/menus`, `lib/menus.ts`, `lib/menu-select.ts`, `lib/search.ts`, `lib/compare.ts`, `lib/past-result.ts`, `lib/thumbnail.ts`, `lib/collect-client.ts`(→ run-steps로 합침), `components/MenuPicker.tsx`, `components/PastCompare.tsx`, `components/ResultSearch.tsx`.
+`trash-can/`으로 옮길 것(**화면을 2판으로 바꾸는 6번 작업 때 한꺼번에** — 그 전에 옮기면 1판 화면이 빌드되지 않아 배포본이 멈춘다): `lib/types.ts`, `app/api/image`, `app/api/menus`, `lib/menus.ts`, `lib/menu-select.ts`, `lib/search.ts`, `lib/compare.ts`, `lib/past-result.ts`, `lib/thumbnail.ts`, `lib/collect-client.ts`(→ run-steps로 합침), `components/MenuPicker.tsx`, `components/PastCompare.tsx`, `components/ResultSearch.tsx`.
 
 ## 13. 구현 순서 (PLAN 작업 6~22와 연결)
 
-1. `@anthropic-ai/sdk` 설치, `lib/types.ts` 새로 쓰기, 쓰지 않을 파일 `trash-can/`으로 (PLAN 5)
+1. `@anthropic-ai/sdk` 설치(0.134.0), `lib/refresh-types.ts` 만들기 (PLAN 5) — **2026-10-15 완료**
 2. `lib/targets.ts` + `/api/targets` (PLAN 6)
 3. `lib/collect.ts`·`lib/extract.ts`·`lib/home-link.ts` + `/api/collect` (PLAN 7·8·11·12)
 4. `lib/ai-judge.ts` + `/api/judge` + `lib/run-password.ts` (PLAN 9·10)
 5. `scripts/run-dev.ts`로 전체 실행 → 20개 대조 (PLAN 13·14)
-6. 화면 3개 (PLAN 15~17)
+6. 화면 3개, 1판 파일 `trash-can/`으로 (PLAN 15~17)
 7. `lib/group.ts`·`lib/excel.ts`·`lib/download.ts` (PLAN 18~21)
 8. 처음부터 끝까지 PC·배포본 확인, Vercel에 `ANTHROPIC_API_KEY`·`RUN_PASSWORD` 넣기 (PLAN 22)
 
@@ -240,3 +241,4 @@ scripts/
 | 날짜 | 내용 |
 |---|---|
 | 2026-10-15 | 2판 처음 작성 (요구사항 문서 기준, 사이트 조사 결과·담당자 결정 반영) |
+| 2026-10-15 | 구현 1: SDK 설치, 타입을 `lib/refresh-types.ts`로(1판 화면 유지 위해), 그림 캡처를 AI 판단이 아닌 수집 때 서버 브라우저가 찍도록 바꿈(그림 줄이기 패키지가 필요 없게), 1판 파일 정리는 화면 교체 작업으로 미룸 |
