@@ -56,7 +56,7 @@ export default function Home() {
     }
   };
 
-  // [엑셀 다운로드]: 실패·확인 필요가 있으면 확인창 → 4개 시트 엑셀 만들기 → 내려받기 (PRD must 2)
+  // [엑셀 다운로드]: 실패·확인 필요가 있으면 확인창 → 5개 시트 엑셀 만들기 → 내려받기 (PRD must 2)
   const download = async () => {
     if (screen.kind !== '결과' || downloadLabel) return;
     setDownloadLabel('엑셀 만드는 중…');

@@ -1,10 +1,11 @@
-// 엑셀 만들기 — 4개 시트 (DESIGN.md 9장, PRD must 2, PLAN 작업 18~21)
-//   1. 현행화_기록: 요구사항 4~5 결과 (그림 행·문장 행, 찾은 순서대로)
+// 엑셀 만들기 — 5개 시트 (DESIGN.md 9장, PRD must 2, PLAN 작업 18~21)
+//   1. 현행화_기록: 요구사항 3~4 결과 (그림 행·문장 행, 찾은 순서대로)
 //   2. 현행화_정렬: 시트 1 전체를 같은 그림·문장끼리 정렬하고 그룹ID를 단 것
-//   3. 현행화_병합: 유일한 그림·문장 하나를 한 행으로 합친 것
-//   4. 수집_기록: 기준·페이지 목록·확인 필요·홈페이지 경로 없음·대상 아님·연도 없음 그림 목록
+//   3. 검토할 이미지: 유일한 그림 하나를 한 행으로 합친 것 (요구사항 7)
+//   4. 검토할 텍스트: 유일한 문장 하나를 한 행으로 합친 것 (요구사항 7)
+//   5. 수집_기록: 기준·페이지 목록·확인 필요·홈페이지 경로 없음·대상 아님·연도 없음 그림 목록
 // 캡처 그림은 같은 그림을 한 번만 파일에 넣고 여러 행에서 다시 쓴다(파일 크기를 줄이기 위해).
-// 3과정 모두에 나오는 그룹은 노란색으로 표시한다. "수정 후 내용"은 빈칸(담당자가 채움).
+// 3과정 모두에 나오는 그룹은 노란색으로 표시한다. "수정 후 내용" 칸은 없다(2026-10-20 요구사항 수정).
 // 화면(브라우저)과 개발용 실행(Node)에서 모두 돌아간다.
 //
 // scripts/에서도 불러오므로 lib 파일은 상대 경로 + .ts 확장자로 불러온다(CLAUDE.md 5장).
@@ -25,7 +26,7 @@ export interface ExcelInput {
   records: RecordRow[];
 }
 
-export const SHEET_NAMES = ['현행화_기록', '현행화_정렬', '현행화_병합', '수집_기록'] as const;
+export const SHEET_NAMES = ['현행화_기록', '현행화_정렬', '검토할 이미지', '검토할 텍스트', '수집_기록'] as const;
 
 /** 캡처를 엑셀 칸에 보여 줄 최대 크기(픽셀) */
 const CAPTURE_MAX = { width: 300, height: 160 };
@@ -165,8 +166,7 @@ const RECORD_COLUMNS: Column[] = [
   { header: '판정', width: 10 },
   { header: '홈페이지 경로', width: 22 },
   { header: '홈페이지 주소', width: 30 },
-  { header: '수정 전 내용', width: 40 },
-  { header: '수정 후 내용', width: 40 },
+  { header: '텍스트 내용', width: 40 },
   { header: '관련 그림', width: 18 },
   { header: '비고', width: 30 },
 ];
@@ -189,7 +189,6 @@ function recordValues(r: RecordRow): (string | number | { text: string; hyperlin
     homePath(r.homeLink),
     link(r.homeLink?.url),
     r.before ?? '',
-    '', // 수정 후 내용: 담당자가 채움
     (r.relatedImages ?? []).join(', '),
     r.note,
   ];
@@ -218,57 +217,81 @@ function addSortedSheet(wb: ExcelJS.Workbook, store: CaptureStore, groups: Recor
   });
 }
 
-/** 시트 3: 현행화_병합 (그룹 1개 = 1행) */
-function addMergedSheet(wb: ExcelJS.Workbook, store: CaptureStore, groups: RecordGroup[]) {
+/** 그룹 행들에서 빈 값을 빼고 겹치지 않게 모은다 */
+const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
+
+/** 시트 3·4 공통: 나온 곳 수 · 나온 과정 · 위치 목록 · 페이지 주소 목록 · 비고 */
+function mergedTail(g: RecordGroup): (string | number)[] {
+  const locations = g.rows.map(
+    (r) => `${r.location.course} > ${r.location.level2} > ${r.location.level3} > ${r.pageTitle} · ${r.section}${r.imageIndex ? ` ${r.imageIndex}번째` : ''}`,
+  );
+  return [
+    g.rows.length,
+    g.courses.join('·'),
+    locations.join('\n'),
+    unique(g.rows.map((r) => r.location.url)).join('\n'),
+    unique(g.rows.map((r) => r.note)).join('\n'),
+  ];
+}
+
+const MERGED_TAIL_COLUMNS: Column[] = [
+  { header: '나온 곳 수', width: 8 },
+  { header: '나온 과정', width: 14 },
+  { header: '위치 목록', width: 50 },
+  { header: '페이지 주소 목록', width: 50 },
+  { header: '비고', width: 30 },
+];
+
+/** 시트 3: 검토할 이미지 (그림 그룹 1개 = 1행, 요구사항 7) */
+function addReviewImageSheet(wb: ExcelJS.Workbook, store: CaptureStore, groups: RecordGroup[]) {
   const ws = addTableSheet(wb, SHEET_NAMES[2], [
     { header: '그룹ID', width: 9 },
-    { header: '구분', width: 6 },
-    { header: '캡처', width: CAPTURE_COL_WIDTH },
-    { header: '그림 파일', width: 18 },
+    { header: '캡처 이미지', width: CAPTURE_COL_WIDTH },
+    { header: '파일명', width: 18 },
     { header: '최고 연도', width: 8 },
     { header: '판정', width: 10 },
     { header: '홈페이지 경로', width: 22 },
     { header: '홈페이지 주소', width: 30 },
-    { header: '수정 전 내용', width: 40 },
-    { header: '수정 후 내용', width: 40 },
-    { header: '나온 곳 수', width: 8 },
-    { header: '나온 과정', width: 14 },
-    { header: '위치 목록', width: 50 },
-    { header: '페이지 주소 목록', width: 50 },
-    { header: '비고', width: 30 },
+    ...MERGED_TAIL_COLUMNS,
   ]);
-  const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
-  groups.forEach((g, i) => {
-    const first = g.rows[0];
-    const paths = unique(g.rows.map((r) => homePath(r.homeLink)));
-    const homeUrls = unique(g.rows.map((r) => r.homeLink?.url ?? ''));
-    const locations = g.rows.map(
-      (r) => `${r.location.course} > ${r.location.level2} > ${r.location.level3} > ${r.pageTitle} · ${r.section}${r.imageIndex ? ` ${r.imageIndex}번째` : ''}`,
-    );
-    ws.addRow([
-      g.id,
-      g.kind,
-      first.capture ? '' : '캡처 없음',
-      unique(g.rows.map((r) => (r.src ? fileNameOf(r.src) : ''))).join('\n'),
-      first.maxYear ?? '',
-      first.verdict ?? '',
-      paths.join('\n'),
-      homeUrls.join('\n'),
-      first.before ?? '',
-      '',
-      g.rows.length,
-      g.courses.join('·'),
-      locations.join('\n'),
-      unique(g.rows.map((r) => r.location.url)).join('\n'),
-      unique(g.rows.map((r) => r.note)).join('\n'),
-    ]);
-    styleRow(ws, i + 2, store.get(first.capture), 3, g.courses.length === COURSES.length ? ALL3_FILL : undefined);
-  });
+  groups
+    .filter((g) => g.kind === '그림')
+    .forEach((g, i) => {
+      const first = g.rows[0];
+      ws.addRow([
+        g.id,
+        first.capture ? '' : '캡처 없음',
+        unique(g.rows.map((r) => (r.src ? fileNameOf(r.src) : ''))).join('\n'),
+        first.maxYear ?? '',
+        first.verdict ?? '',
+        unique(g.rows.map((r) => homePath(r.homeLink))).join('\n'),
+        unique(g.rows.map((r) => r.homeLink?.url ?? '')).join('\n'),
+        ...mergedTail(g),
+      ]);
+      styleRow(ws, i + 2, store.get(first.capture), 2, g.courses.length === COURSES.length ? ALL3_FILL : undefined);
+    });
 }
 
-/** 시트 4: 수집_기록 (구역마다 제목 줄 + 표) */
+/** 시트 4: 검토할 텍스트 (문장 그룹 1개 = 1행, 요구사항 7) */
+function addReviewTextSheet(wb: ExcelJS.Workbook, store: CaptureStore, groups: RecordGroup[]) {
+  const ws = addTableSheet(wb, SHEET_NAMES[3], [
+    { header: '그룹ID', width: 9 },
+    { header: '캡처 이미지', width: CAPTURE_COL_WIDTH },
+    { header: '캡처 내용(텍스트)', width: 40 },
+    ...MERGED_TAIL_COLUMNS,
+  ]);
+  groups
+    .filter((g) => g.kind === '문장')
+    .forEach((g, i) => {
+      const first = g.rows[0];
+      ws.addRow([g.id, first.capture ? '' : '캡처 없음', first.before ?? '', ...mergedTail(g)]);
+      styleRow(ws, i + 2, store.get(first.capture), 2, g.courses.length === COURSES.length ? ALL3_FILL : undefined);
+    });
+}
+
+/** 시트 5: 수집_기록 (구역마다 제목 줄 + 표) */
 function addLogSheet(wb: ExcelJS.Workbook, input: ExcelInput, groups: RecordGroup[]) {
-  const ws = wb.addWorksheet(SHEET_NAMES[3]);
+  const ws = wb.addWorksheet(SHEET_NAMES[4]);
   ws.columns = [{ width: 28 }, { width: 50 }, { width: 14 }, { width: 14 }, { width: 50 }];
   const js = [...input.judgements.values()];
   const count = (v: string) => js.filter((j) => j.verdict === v).length;
@@ -308,7 +331,7 @@ function addLogSheet(wb: ExcelJS.Workbook, input: ExcelInput, groups: RecordGrou
       ['검색한 페이지', `${input.results.length}개 (실패 ${input.results.filter((r) => r.status !== '성공').length}개)`],
       ['본문 그림', `${js.length}개 — 현행화 대상 ${count('현행화 대상')} · 대상 아님 ${count('대상 아님')} · 연도 없음 ${count('연도 없음')} · 확인 필요 ${count('확인 필요')}`],
       ['시트 1 행', `${input.records.length}행 (그룹 ${groups.length}개: 그림 ${groups.filter((g) => g.kind === '그림').length} · 문장 ${groups.filter((g) => g.kind === '문장').length})`],
-      ['수정 후 내용', '앱이 채우지 않아요. 담당자가 현행화_기록·현행화_병합 시트에서 채워 주세요.'],
+      ['검토 시트', '검토할 이미지·검토할 텍스트 시트는 같은 그림·문장을 한 줄로 합친 것이에요. 그룹ID로 현행화_정렬 시트의 행을 찾을 수 있어요.'],
       ['노란색 행', '초등·중학·고교 3과정 모두에 나오는 그림·문장'],
     ],
   );
@@ -351,7 +374,7 @@ function addLogSheet(wb: ExcelJS.Workbook, input: ExcelInput, groups: RecordGrou
   );
 }
 
-/** 4개 시트 엑셀을 만들어 파일 내용을 돌려준다 */
+/** 5개 시트 엑셀을 만들어 파일 내용을 돌려준다 */
 export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'SGIS에듀 현행화 대상 찾기';
@@ -362,7 +385,8 @@ export async function buildWorkbook(input: ExcelInput): Promise<ArrayBuffer> {
 
   addRecordSheet(wb, store, input.records, all3);
   addSortedSheet(wb, store, groups);
-  addMergedSheet(wb, store, groups);
+  addReviewImageSheet(wb, store, groups);
+  addReviewTextSheet(wb, store, groups);
   addLogSheet(wb, input, groups);
   return wb.xlsx.writeBuffer() as Promise<ArrayBuffer>;
 }

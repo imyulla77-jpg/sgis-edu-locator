@@ -152,7 +152,7 @@ async function main(): Promise<void> {
   });
   writeFileSync(`${sampleDir}/sample.md`, lines.join('\n'));
 
-  // ⑦ 엑셀 (화면의 [엑셀 다운로드]와 같은 4개 시트)
+  // ⑦ 엑셀 (화면의 [엑셀 다운로드]와 같은 5개 시트)
   const t3 = Date.now();
   const xlsx = await buildWorkbook({ startUrl, finishedAt: new Date(), targets, results, judgements, records });
   const xlsxFile = `${OUTPUT_DIR}/${excelFileName().replace('.xlsx', `_${runId}.xlsx`)}`;

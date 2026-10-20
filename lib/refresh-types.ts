@@ -112,7 +112,7 @@ export interface PageResult {
 
 /**
  * 시트 1(현행화_기록)의 행 하나 = (현행화 대상·확인 필요 그림 또는 수정 필요 문장) × (메뉴 위치 1곳) (DESIGN.md 9장)
- * lib/records.ts가 만들고, 시트 2·3도 이 행으로 만든다.
+ * lib/records.ts가 만들고, 시트 2~4도 이 행으로 만든다.
  */
 export interface RecordRow {
   /** 1부터 */
@@ -135,7 +135,7 @@ export interface RecordRow {
   verdict?: Verdict;
   /** 그림 행: 홈페이지 경로 (바로가기가 없으면 null) */
   homeLink?: HomeLink | null;
-  /** 문장 행: 수정 전 내용 */
+  /** 문장 행: 텍스트 내용(고칠 문장의 지금 내용) */
   before?: string;
   /** 문장 행: 같은 영역의 대상·확인 필요 그림 파일 이름 */
   relatedImages?: string[];
